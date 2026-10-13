@@ -1,0 +1,7 @@
+# The pipeline and the app run on the standard library. These add links, speech to text and free web search.
+yt-dlp>=2026.8.19        # read YouTube, Instagram, TikTok, X posts
+faster-whisper>=1.2.1    # speech to text on the CPU (downloads its model on first use)
+av>=19.0.1               # decode audio and take video stills (no ffmpeg needed)
+numpy>=2.0
+Pillow>=11.0             # shrink pictures for the model
+ddgs>=9.16.0             # DuckDuckGo search, no key needed

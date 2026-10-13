@@ -1,0 +1,1268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="token" content="__TOKEN__">
+<title>MyWiki</title>
+<link rel="icon" href="/icon.png?v=sun">
+<script>try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,300..700&display=swap" rel="stylesheet">
+<style>
+/* Flat and quiet: white page, a cream art panel, one coral sun with a violet moon that tracks progress. */
+:root {
+  color-scheme: light;
+  --page: #FFFFFF; --panel: #FFF4DA; --ink: #1B1D3A; --ink-2: #5E6079; --ink-3: #A4A6B8; --line: #ECECF2;
+  --violet: #7C6CF6; --coral: #FF7E6B; --pink: #FDDCDC; --butter: #FFE9A8; --red: #E5484D; --green: #22A06B; --amber: #D98E04;
+  --font: 'Nunito Sans', 'Avenir Next', 'Avenir', 'Segoe UI', system-ui, sans-serif;
+  --out: cubic-bezier(.23, 1, .32, 1);
+  --move: cubic-bezier(.77, 0, .175, 1);
+}
+/* dark follows the system until the switch picks one; the choice is remembered */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #15162A; --panel: #1E1F36; --ink: #F1F1F7; --ink-2: #A3A5BF; --ink-3: #64667F; --line: #26283F;
+    --violet: #8E80FF; --coral: #FF8672; --pink: rgba(253, 160, 160, .16); --butter: rgba(255, 220, 130, .08); --red: #FF6369; --green: #3DD68C; --amber: #F5B83D;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #15162A; --panel: #1E1F36; --ink: #F1F1F7; --ink-2: #A3A5BF; --ink-3: #64667F; --line: #26283F;
+  --violet: #8E80FF; --coral: #FF8672; --pink: rgba(253, 160, 160, .16); --butter: rgba(255, 220, 130, .08); --red: #FF6369; --green: #3DD68C; --amber: #F5B83D;
+}
+html, body, .art, .toast { transition: background-color .4s ease, color .4s ease; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--page); }
+body { color: var(--ink); font: 400 15px/1.65 var(--font); -webkit-font-smoothing: antialiased; }
+::selection { background: color-mix(in srgb, var(--violet) 25%, transparent); }
+:focus-visible { outline: 2px solid var(--violet); outline-offset: 3px; }
+button, input { font: inherit; color: inherit; letter-spacing: inherit; }
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+code { font: 13px ui-monospace, 'Cascadia Code', Consolas, monospace; color: var(--ink-2); }
+.num { font-variant-numeric: tabular-nums; }
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ink) 18%, transparent); border-radius: 8px; }
+
+/* ---------- the two halves ---------- */
+.content { width: 60vw; min-height: 100vh; padding: 0 7vw 96px; }
+.content > * { max-width: 820px; }
+.art { position: fixed; top: 0; right: 0; bottom: 0; width: 40vw; background: var(--panel); overflow: hidden; }
+.sun { --d: min(62vh, 560px); position: absolute; left: calc(var(--d) / -2); top: 9vh; width: var(--d); height: var(--d); border-radius: 50%; background: var(--coral); }
+.sun .read { position: absolute; left: 50%; right: 0; top: 0; bottom: 0; display: grid; place-content: center; text-align: center; color: #fff; padding-right: 4%; }
+.sun .read b { font-size: clamp(44px, 6vw, 76px); font-weight: 300; line-height: 1; letter-spacing: -.02em; }
+.sun .read b span { font-size: .45em; opacity: .75; }
+.sun .read small { font-size: 14px; opacity: .9; margin-top: 8px; }
+.orbit { position: absolute; inset: 0; transform: rotate(30deg); transition: transform 1.4s var(--move); }
+/* running: the sun breathes; each stage has its own motion (body[data-stage]) */
+.sun::before, .sun::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--coral); opacity: 0; pointer-events: none; }
+body.running .sun { animation: breathe 3.2s ease-in-out infinite; }
+body.running .orbit i { animation: moon 1.6s ease-in-out infinite; }
+@keyframes breathe { 50% { transform: scale(1.02); } }
+@keyframes moon { 50% { transform: scale(1.22); box-shadow: 0 0 0 10px color-mix(in srgb, var(--violet) 22%, transparent); } }
+.dots circle { transform-box: fill-box; transform-origin: center; }
+.scan { position: absolute; inset: 0; border-radius: 50%; opacity: 0; transition: opacity .6s ease; background: conic-gradient(from 0deg, transparent 0 72%, rgba(255, 255, 255, .38) 100%); }
+.pen { position: absolute; left: 58%; width: 26%; bottom: 25%; display: grid; gap: 9px; opacity: 0; transition: opacity .5s ease; }
+.pen i { height: 3px; border-radius: 3px; background: rgba(255, 255, 255, .75); transform-origin: left; transform: scaleX(0); }
+.pen i:nth-child(2) { width: 80%; } .pen i:nth-child(3) { width: 55%; }
+.web path { fill: none; stroke: var(--violet); stroke-width: 1.4; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; }
+/* Collect: the dot field streams into the sun, column by column */
+[data-stage="harvest"] .dots circle { animation: gather 1.8s var(--out) infinite; animation-delay: calc(var(--c) * -.3s); }
+@keyframes gather { 0% { transform: none; opacity: 1; } 65% { transform: translateX(-26px) scale(.4); opacity: 0; } 66% { transform: translateX(14px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+/* Find: a radar beam sweeps the sun, dots light up as it passes */
+[data-stage="extract"] .scan, [data-stage="research"] .scan { opacity: 1; animation: spin 2.6s linear infinite; }
+[data-stage="extract"] .dots circle, [data-stage="research"] .dots circle { animation: twinkle 2.4s ease-in-out infinite; animation-delay: calc(var(--i) * -.37s); }
+@keyframes twinkle { 50% { opacity: .15; transform: scale(.6); } }
+/* Write: lines are written across the sun, the moon scribbles like a pen */
+[data-stage="integrate"] .pen, [data-stage="brief"] .pen { opacity: 1; }
+[data-stage="integrate"] .pen i, [data-stage="brief"] .pen i { animation: write 2.7s var(--move) infinite; }
+.pen i:nth-child(2) { animation-delay: .45s !important; } .pen i:nth-child(3) { animation-delay: .9s !important; }
+@keyframes write { 0% { transform: scaleX(0); opacity: 1; } 40%, 80% { transform: scaleX(1); opacity: 1; } 100% { transform: scaleX(1); opacity: 0; } }
+[data-stage="integrate"] .orbit i, [data-stage="brief"] .orbit i { animation: scribble .9s ease-in-out infinite; }
+@keyframes scribble { 25% { transform: translate(5px, -4px); } 50% { transform: translate(-3px, 3px); } 75% { transform: translate(4px, 4px); } }
+/* Connect: a constellation is drawn between the dots */
+[data-stage="connect"] .web path { animation: draw 3.6s var(--move) infinite; animation-delay: calc(var(--k) * .5s); }
+@keyframes draw { 0% { stroke-dashoffset: 1; opacity: 1; } 45%, 75% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+[data-stage="connect"] .dots circle { animation: twinkle 3.6s ease-in-out infinite; animation-delay: calc(var(--i) * -.21s); }
+/* Tidy: the pink shape squares itself up, dots settle row by row */
+[data-stage="migrate"] .blob, [data-stage="consolidate"] .blob { animation: straighten 3s var(--move) infinite; }
+@keyframes straighten { 0%, 100% { transform: rotate(40deg); border-radius: 70px; } 45%, 60% { transform: rotate(0deg); border-radius: 10px; } }
+[data-stage="migrate"] .dots circle { animation: settle 3s var(--move) infinite; animation-delay: calc(var(--r) * .12s); }
+@keyframes settle { 0%, 100% { transform: none; } 30% { transform: translateY(-5px); } 55% { transform: none; } }
+/* Tidy up: two shapes drift together and merge into one */
+[data-stage="consolidate"] .blob2 { animation: merge 3.6s var(--move) infinite; }
+@keyframes merge { 50% { transform: translate(min(18vw, 180px), -40px) scale(.7); opacity: .6; } }
+/* Save: rings go out from the sun */
+[data-stage="save"] .sun::before { animation: ripple 2.2s var(--out) infinite; }
+[data-stage="save"] .sun::after { animation: ripple 2.2s var(--out) 1.1s infinite; }
+@keyframes ripple { 0% { opacity: .55; transform: scale(1); } 100% { opacity: 0; transform: scale(1.32); } }
+.orbit i { position: absolute; left: 50%; top: 0; width: 40px; height: 40px; margin: -20px; border-radius: 50%; background: var(--violet); }
+.dots { position: absolute; top: 7vh; right: -6px; width: 130px; height: 150px; }
+.dots circle { fill: var(--coral); }
+.blob { position: absolute; right: -60px; bottom: -70px; width: 240px; height: 240px; border-radius: 70px; background: var(--pink); transform: rotate(40deg); }
+.blob2 { position: absolute; left: 30%; bottom: -90px; width: 200px; height: 200px; border-radius: 50%; background: var(--butter); }
+
+/* ---------- top ---------- */
+header { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 40px; padding: 30px 0 14px; background: var(--page); transition: background-color .4s ease; }
+header::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 24px; background: linear-gradient(var(--page), transparent); pointer-events: none; }
+.mark { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+.mark svg { width: 26px; height: 26px; }
+.mark em { font-style: normal; color: var(--coral); }
+nav { display: flex; gap: 30px; margin-left: auto; }
+nav button { position: relative; border: 0; background: none; padding: 4px 0; font-size: 13.5px; color: var(--ink-2); transition: color .2s ease; }
+nav button::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 2px; background: var(--violet); transform: scaleX(0); transform-origin: left; transition: transform .35s var(--out); }
+nav button:hover { color: var(--ink); }
+nav button[aria-current] { color: var(--ink); }
+nav button[aria-current]::after { transform: none; }
+.theme { width: 34px; height: 34px; margin-left: -6px; border: 0; border-radius: 50%; background: none; display: grid; place-items: center; color: var(--ink-2); transition: color .2s ease, background-color .2s ease; }
+.theme:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.theme svg { width: 18px; height: 18px; transition: transform .5s var(--out); }
+.theme:active svg { transform: rotate(40deg) scale(.9); }
+nav button .due { position: absolute; top: 3px; right: -9px; width: 6px; height: 6px; border-radius: 50%; background: var(--coral); }
+
+section.view { display: none; }
+section.view.on { display: block; animation: rise .5s var(--out) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+
+h1 { font-size: clamp(36px, 3.6vw, 50px); line-height: 1.2; font-weight: 400; letter-spacing: -.012em; margin: 16vh 0 0; text-wrap: balance; }
+h1 em { display: block; font-style: normal; color: var(--coral); }
+.lede { margin: 22px 0 0; color: var(--ink-2); font-size: 16px; max-width: 46ch; text-wrap: pretty; }
+.lede b { color: var(--ink); font-weight: 600; }
+.bar { position: relative; width: 220px; height: 1px; background: var(--line); margin-top: 22px; }
+.bar i { position: absolute; left: 0; top: -.5px; height: 2px; width: 100%; background: var(--violet); transform-origin: left; transform: scaleX(.3); transition: transform 1.2s var(--move); }
+h2 { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin: 72px 0 18px; }
+.hint { color: var(--ink-3); font-size: 13.5px; margin: 0; }
+
+/* ---------- buttons: flat ---------- */
+.actions { display: flex; align-items: center; gap: 28px; margin-top: 44px; flex-wrap: wrap; }
+.btn {
+  height: 52px; padding: 0 30px; border: 0; border-radius: 2px; display: inline-flex; align-items: center; gap: 12px; flex: none;
+  font-size: 14px; font-weight: 600; background: var(--violet); color: #fff; transition: background-color .2s ease, transform .16s var(--out);
+}
+.btn svg { width: 17px; height: 17px; }
+.btn:hover { background: color-mix(in srgb, var(--violet) 88%, #000); }
+.btn:active { transform: scale(.98); }
+.btn.quiet { background: none; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.btn.quiet:hover { box-shadow: inset 0 0 0 1px var(--ink-3); }
+.btn:disabled { opacity: .45; cursor: default; transform: none; }
+body.running #runNow { opacity: 1; background: var(--coral); }
+body.running #runNow svg { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.link { border: 0; background: none; padding: 0; color: var(--ink-2); font-size: 14px; display: inline-flex; align-items: center; gap: 8px; transition: color .2s ease; }
+.link svg { width: 15px; height: 15px; }
+.link:hover { color: var(--violet); }
+
+/* ---------- NOW ---------- */
+.steps-row { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
+.st { position: relative; padding-top: 14px; }
+.st::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--line); }
+.st::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--violet); transform-origin: left; transform: scaleX(var(--f, 0)); transition: transform 1s var(--move); }
+.st .name { font-size: 15px; font-weight: 600; color: var(--ink-3); transition: color .3s ease; }
+.st .count { display: block; font-size: 13px; color: var(--ink-3); }
+.st[data-s="running"] .name, .st[data-s="done"] .name, .st[data-s="partial"] .name { color: var(--ink); }
+.st[data-s="running"]::after { background: linear-gradient(90deg, var(--coral) 0 40%, color-mix(in srgb, var(--coral) 35%, var(--page)) 50%, var(--coral) 60% 100%); background-size: 250% 100%; animation: sweep 1.4s linear infinite; }
+@keyframes sweep { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+.st[data-s="running"] .count { color: var(--coral); }
+.st[data-s="failed"] .name, .st[data-s="failed"] .count, .st .bad { color: var(--red); }
+.now-item { margin-top: 20px; font-size: 14px; color: var(--ink-2); display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; }
+.now-item > span { color: var(--ink-3); }
+.now-item b { display: block; }
+.now-item b { color: var(--ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+.figures b { display: block; font-size: 34px; font-weight: 300; letter-spacing: -.02em; line-height: 1.2; }
+.figures b span { font-size: 17px; color: var(--ink-3); }
+.figures small { color: var(--ink-2); font-size: 13px; line-height: 1.4; display: block; }
+
+.feed { list-style: none; margin: 0; padding: 0; }
+.feed li { display: grid; grid-template-columns: 56px 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.feed li.new { animation: rise .5s var(--out) both; }
+.feed time { color: var(--ink-3); font-size: 13px; padding-top: 1px; }
+.feed .x { min-width: 0; }
+.feed .x div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feed .x small { display: block; color: var(--ink-3); font-size: 13px; }
+.feed .failed .x div, .feed .failed small { color: var(--red); }
+.feed .empty { display: block; color: var(--ink-3); }
+.more { margin-top: 14px; }
+
+/* ---------- NEWS ---------- */
+.ask { margin-top: 44px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--line); transition: border-color .2s ease; }
+.ask:focus-within { border-color: var(--violet); }
+.ask svg { width: 20px; height: 20px; color: var(--ink-3); flex: none; }
+.ask input { flex: 1; min-width: 0; border: 0; background: none; outline: none; font-size: 24px; font-weight: 300; padding: 14px 0; }
+.ask input::placeholder { color: var(--ink-3); }
+.links ul { list-style: none; margin: 18px 0 0; padding: 0; }
+.links li { display: grid; grid-template-columns: 112px 1fr; gap: 4px 18px; padding: 16px 0; border-top: 1px solid var(--line); animation: rise .4s var(--out) both; }
+.links img, .links .noimg { grid-row: 1 / span 3; width: 112px; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 10px; background: var(--line); }
+.links b { font-size: 16px; line-height: 1.35; }
+.links small { color: var(--ink-3); font-size: 12.5px; }
+.links .how { color: var(--ink-2); font-size: 13px; }
+.links .bad { grid-column: 1 / -1; color: var(--red); font-size: 13.5px; }
+.links .opts .hint { margin-right: auto; color: var(--ink-3); font-size: 13px; }
+.opts { display: flex; align-items: center; gap: 28px; margin-top: 22px; flex-wrap: wrap; }
+.seg { display: inline-flex; gap: 18px; }
+.seg button { position: relative; border: 0; background: none; padding: 3px 0; font-size: 14px; color: var(--ink-3); transition: color .2s ease; }
+.seg button::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--violet); transform: scaleX(0); transform-origin: left; transition: transform .35s var(--out); }
+.seg button:hover { color: var(--ink-2); }
+.seg button[aria-pressed="true"] { color: var(--ink); font-weight: 600; }
+.seg button[aria-pressed="true"]::after { transform: none; }
+.opts .btn { margin-left: auto; }
+.chips { display: flex; gap: 8px 22px; flex-wrap: wrap; margin-top: 24px; }
+.chips button { border: 0; background: none; padding: 0; color: var(--ink-2); font-size: 13.5px; }
+.chips button::before { content: "#"; color: var(--coral); margin-right: 3px; }
+.chips button:hover { color: var(--violet); }
+.stories { list-style: none; margin: 0; padding: 0; }
+.stories button { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 1fr auto; gap: 2px 16px; width: 100%; padding: 18px 0; border-top: 1px solid var(--line); cursor: pointer; }
+.stories button:hover b { color: var(--violet); }
+.stories b { font-size: 18px; font-weight: 600; transition: color .2s ease; }
+.stories time { color: var(--coral); font-size: 13px; padding-top: 4px; }
+.stories p { grid-column: 1 / -1; margin: 0; color: var(--ink-2); font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.segs { margin-top: 36px; }
+.segs button[aria-pressed="true"] { color: var(--ink); font-weight: 600; }
+.news li { display: grid; grid-template-columns: 1fr auto; gap: 4px 24px; padding: 20px 0; border-top: 1px solid var(--line); animation: rise .5s var(--out) both; }
+.news .seg-l { grid-column: 1 / -1; font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--coral); }
+.news a { color: var(--ink); text-decoration: none; font-size: 17px; font-weight: 600; line-height: 1.35; transition: color .2s ease; cursor: pointer; }
+.news a:hover { color: var(--violet); }
+.news p { margin: 2px 0 0; color: var(--ink-2); font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.news small { color: var(--ink-3); font-size: 12.5px; }
+.news .act { grid-row: 2 / span 3; grid-column: 2; align-self: center; }
+.news .act .btn { height: 40px; padding: 0 18px; font-size: 13px; }
+.news .act .done { color: var(--ink-3); font-size: 13px; max-width: 200px; display: block; text-align: right; }
+.news { list-style: none; margin: 0; padding: 0; }
+.news .pick { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--line); font-size: 13px; font-weight: 600; cursor: pointer; user-select: none; transition: box-shadow .2s ease, background-color .2s ease; }
+.news .pick:hover { box-shadow: inset 0 0 0 1px var(--ink-3); }
+.news .pick:has(input:checked) { background: var(--violet); color: #fff; box-shadow: none; }
+.news .pick input { accent-color: #fff; width: 15px; height: 15px; margin: 0; cursor: pointer; }
+.pickbar { position: sticky; bottom: 20px; z-index: 15; display: flex; align-items: center; gap: 16px; margin-top: 16px; padding: 12px 14px 12px 22px; border-radius: 999px; background: var(--page); box-shadow: 0 0 0 1px var(--line), 0 12px 32px rgba(0,0,0,.14); font-weight: 600; animation: rise .3s var(--out) both; }
+.pickbar[hidden] { display: none; }
+.pickbar .btn { margin-left: auto; height: 40px; }
+.stories .empty, .news .empty { padding: 18px 0; color: var(--ink-3); border-top: 1px solid var(--line); }
+
+/* ---------- EXPORT ---------- */
+.state { margin-top: 22px; font-size: 14px; color: var(--ink-2); display: flex; align-items: center; gap: 10px; }
+.state i { width: 8px; height: 8px; border-radius: 50%; background: #3CC48F; }
+.state.due i { background: var(--coral); }
+.state b { color: var(--ink); font-weight: 600; }
+.steps { list-style: none; margin: 56px 0 0; padding: 0; counter-reset: s; }
+.steps > li { display: grid; grid-template-columns: 64px 1fr; padding: 26px 0; border-top: 1px solid var(--line); counter-increment: s; }
+.steps > li::before { content: counter(s, decimal-leading-zero); font-size: 26px; font-weight: 300; color: var(--coral); line-height: 1.1; }
+.steps h3 { font-size: 17px; font-weight: 600; margin: 0 0 4px; }
+.steps p { margin: 0 0 16px; color: var(--ink-2); font-size: 14.5px; }
+.steps p b { color: var(--ink); font-weight: 600; }
+.drop { padding: 16px; display: grid; gap: 10px; background: color-mix(in srgb, var(--panel) 70%, var(--page)); outline: 1.5px dashed transparent; outline-offset: -1.5px; transition: outline-color .2s ease; }
+.drop.over { outline-color: var(--violet); }
+.found { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.found li { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 14px; }
+.found b { font-weight: 600; }
+.found .btn { height: 40px; padding: 0 20px; }
+
+/* ---------- SETTINGS ---------- */
+.prefs { list-style: none; margin: 48px 0 0; padding: 0; }
+.prefs > li { display: grid; grid-template-columns: 1fr minmax(240px, 320px); gap: 24px; align-items: center; padding: 22px 0; border-top: 1px solid var(--line); }
+.prefs .lbl { font-weight: 600; font-size: 15.5px; }
+.prefs p { margin: 2px 0 0; color: var(--ink-3); font-size: 13.5px; }
+.prefs .seg { justify-self: end; }
+.pick { position: relative; }
+.pick > button {
+  width: 100%; height: 44px; padding: 0 2px; border: 0; border-bottom: 1px solid var(--line); background: none; text-align: left;
+  display: flex; align-items: center; gap: 10px; font-size: 14.5px; transition: border-color .2s ease;
+}
+.pick > button:hover, .pick.open > button { border-color: var(--violet); }
+.pick > button span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick > button svg { width: 16px; height: 16px; color: var(--ink-3); transition: transform .3s var(--out); }
+.pick.open > button svg { transform: rotate(180deg); }
+.pop { position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; right: 0; padding: 8px; background: var(--page); box-shadow: 0 0 0 1px var(--line), 0 24px 48px -20px rgba(27, 29, 58, .28); animation: pop .2s var(--out); }
+@keyframes pop { from { opacity: 0; transform: translateY(-4px); } }
+.pop input { width: 100%; height: 40px; padding: 0 10px; border: 0; border-bottom: 1px solid var(--line); background: none; outline: none; font-size: 14px; }
+.pop input:focus { border-color: var(--violet); }
+.pop ul { list-style: none; margin: 6px 0 0; padding: 0; max-height: 300px; overflow: auto; }
+.pop li { padding: 8px 10px; cursor: pointer; display: grid; }
+.pop li small { color: var(--ink-3); font-size: 12.5px; }
+.pop li.on, .pop li:hover { background: color-mix(in srgb, var(--violet) 9%, transparent); }
+.pop li[aria-selected="true"] { color: var(--violet); font-weight: 600; }
+.pop .count { padding: 8px 10px 2px; color: var(--ink-3); font-size: 12px; }
+.formfoot { display: flex; align-items: center; gap: 22px; margin-top: 28px; flex-wrap: wrap; }
+.tidy { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; padding: 20px 0; border-top: 1px solid var(--line); }
+.tidy p { margin: 0; flex: 1 1 320px; color: var(--ink-2); font-size: 14.5px; }
+.tidy b { color: var(--ink); font-weight: 600; }
+.svc { list-style: none; margin: 18px 0 0; padding: 0; }
+.svc > li { display: grid; grid-template-columns: 12px 1fr auto; gap: 4px 16px; padding: 20px 0; border-top: 1px solid var(--line); align-items: start; }
+.svc .st { width: 10px; height: 10px; border-radius: 50%; margin-top: 7px; box-shadow: inset 0 0 0 1.5px var(--ink-3); }
+.svc .st.ok { background: var(--green); box-shadow: none; } .svc .st.warn { background: var(--amber); box-shadow: none; } .svc .st.bad { background: var(--red); box-shadow: none; }
+.svc .lbl { font-weight: 600; font-size: 15.5px; }
+.svc .say { margin: 3px 0 0; color: var(--ink); font-size: 14px; line-height: 1.5; }
+.svc .about { margin: 4px 0 0; color: var(--ink-3); font-size: 13px; }
+.svc .ctl { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 10px; }
+.svc .ctl input[type=password], .svc .ctl input[type=number] { height: 38px; border: 0; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line); background: none; color: var(--ink); padding: 0 12px; font: inherit; font-size: 13.5px; outline: none; }
+.svc .ctl input:focus { box-shadow: inset 0 0 0 1.5px var(--violet); }
+.svc .ctl input[type=password] { width: 240px; } .svc .ctl input[type=number] { width: 72px; }
+.svc .ctl .btn { height: 38px; padding: 0 16px; font-size: 13px; }
+.svc .ctl label { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-2); cursor: pointer; }
+.svc .ctl input[type=checkbox] { accent-color: var(--violet); width: 16px; height: 16px; margin: 0; }
+.svc .meter { width: 120px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; display: inline-block; margin-top: 8px; }
+.svc .meter i { display: block; height: 100%; background: var(--violet); border-radius: 3px; }
+.svc code, .sum code { font-size: 12.5px; background: var(--line); padding: 1px 6px; border-radius: 5px; }
+.svc ol { margin: 8px 0 0; padding-left: 20px; color: var(--ink-2); font-size: 13.5px; line-height: 1.7; }
+.svc .code { font-size: 22px; font-weight: 700; letter-spacing: .12em; color: var(--violet); }
+.sum { margin: 6px 0 0; color: var(--ink-2); font-size: 14.5px; line-height: 1.55; }
+.kv { margin: 0; }
+.kv div { display: grid; grid-template-columns: 120px 1fr; gap: 16px; padding: 13px 0; border-top: 1px solid var(--line); }
+.kv dt { color: var(--ink-3); }
+.kv dd { margin: 0; color: var(--ink-2); }
+
+/* ---------- notice ---------- */
+.toast {
+  position: fixed; left: 30vw; bottom: 32px; z-index: 50; max-width: min(480px, calc(60vw - 48px));
+  padding: 14px 22px; background: var(--ink); color: var(--page); font-size: 14px; border-left: 4px solid var(--violet);
+  transform: translate(-50%, 16px); opacity: 0; pointer-events: none; transition: transform .25s var(--out), opacity .2s ease;
+}
+.toast.on { transform: translate(-50%, 0); opacity: 1; transition: transform .45s var(--out), opacity .25s ease; }
+.toast.bad { border-left-color: var(--red); }
+
+/* setup wizard: a full sheet over the app, steps on the left */
+.setup { position: fixed; inset: 0; z-index: 60; overflow: auto; background: var(--page); animation: fade .25s ease both; }
+.setup[hidden] { display: none; }
+@keyframes fade { from { opacity: 0; } }
+.su { max-width: 1040px; margin: 0 auto; padding: 48px 40px 96px; display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 56px; }
+.su-side { position: sticky; top: 48px; align-self: start; }
+.su-side .mark { margin-bottom: 40px; }
+.su-steps { list-style: none; margin: 0; padding: 0; }
+.su-steps li { display: flex; align-items: center; gap: 12px; padding: 9px 0; font-size: 14.5px; color: var(--ink-3); }
+.su-steps li i { width: 24px; height: 24px; flex: none; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 11.5px; font-weight: 700; box-shadow: inset 0 0 0 1.5px currentColor; transition: background .3s ease, color .3s ease; }
+.su-steps li.done { color: var(--ink-2); } .su-steps li.done i { background: var(--green); color: #fff; box-shadow: none; }
+.su-steps li.on { color: var(--ink); font-weight: 600; } .su-steps li.on i { background: var(--violet); color: #fff; box-shadow: none; }
+.su-main h1 { margin-top: 28px; }
+.su-k { margin: 0; color: var(--violet); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.su-body { margin-top: 36px; animation: rise .35s var(--out) both; }
+.su-foot { position: sticky; bottom: 0; padding: 18px 0; margin-top: 40px; background: linear-gradient(transparent, var(--page) 30%); }
+.su-close { position: fixed; top: 22px; right: 26px; z-index: 61; }
+.field { height: 44px; border: 0; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line); background: none; color: var(--ink); padding: 0 14px; font: inherit; font-size: 14.5px; outline: none; min-width: 0; }
+.field:focus { box-shadow: inset 0 0 0 1.5px var(--violet); }
+.vrow { display: flex; gap: 12px; flex-wrap: wrap; } .vrow .field { flex: 1 1 360px; }
+.say-big { margin: 16px 0 0; font-size: 15px; color: var(--ink-2); line-height: 1.55; } .say-big b { color: var(--ink); }
+.src { list-style: none; margin: 0; padding: 0; }
+.src li { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 14px; align-items: center; padding: 16px 0; border-top: 1px solid var(--line); }
+.src input { accent-color: var(--violet); width: 18px; height: 18px; margin: 0; grid-row: span 2; }
+.src b { font-weight: 600; } .src small { color: var(--ink-3); font-size: 13px; grid-column: 2; }
+.src .n { grid-row: span 2; color: var(--ink-2); font-size: 13.5px; } .src .n.none { color: var(--ink-3); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 0; border-radius: 999px; padding: 9px 15px; background: none; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-2); font-size: 13.5px; transition: background .2s ease, color .2s ease, box-shadow .2s ease, transform .16s var(--out); }
+.chip:hover { box-shadow: inset 0 0 0 1px var(--ink-3); color: var(--ink); }
+.chip:active { transform: scale(.97); }
+.chip[aria-pressed="true"] { background: var(--violet); color: #fff; box-shadow: none; }
+.chip:disabled { opacity: .4; }
+/* model center */
+.mch { margin: 40px 0 0; font-size: 15px; font-weight: 600; }
+.mch small { display: block; margin-top: 2px; font-weight: 400; font-size: 13px; color: var(--ink-3); }
+.mcl .pick { width: 280px; }
+.mcl .tested { margin: 6px 0 0; font-size: 13px; color: var(--ink-3); }
+.mcl .tested.ok { color: var(--green); } .mcl .tested.bad { color: var(--red); }
+.mcl .use { font-size: 12px; font-weight: 700; color: var(--violet); letter-spacing: .04em; margin-left: 8px; }
+.mcl li.off .lbl { color: var(--ink-3); }
+.roles select { height: 40px; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); font: inherit; font-size: 14px; max-width: 320px; }
+.sched { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 16px; }
+.sched label { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 14px; }
+.sched input[type=checkbox] { accent-color: var(--violet); width: 16px; height: 16px; }
+.sched input[type=time] { height: 38px; border: 0; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line); background: none; color: var(--ink); padding: 0 10px; font: inherit; }
+.warnline { color: var(--amber); font-size: 13.5px; margin: 10px 0 0; }
+@media (max-width: 760px) {
+  .su { grid-template-columns: 1fr; gap: 24px; padding: 28px 16px 80px; }
+  .su-side { position: static; } .su-side .mark { margin-bottom: 16px; }
+  .su-steps { display: flex; gap: 6px; } .su-steps li span { display: none; }
+  .mcl .pick { width: 100%; }
+}
+
+@media (max-width: 900px) {
+  .art { display: none; }
+  .content { width: auto; padding: 0 24px 72px; }
+  h1 { margin-top: 64px; }
+  .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .steps-row { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 20px; }
+  .prefs > li { grid-template-columns: 1fr; gap: 10px; } .prefs .seg { justify-self: start; }
+  .toast { left: 50%; max-width: calc(100vw - 48px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .15s !important; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a.8.8 0 0 0 1.2.7l10.4-6.5a.8.8 0 0 0 0-1.4L9.2 4.8A.8.8 0 0 0 8 5.5z"/></symbol>
+    <symbol id="i-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
+    <symbol id="i-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3a9 9 0 1 1-9 9"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></symbol>
+  </defs>
+</svg>
+
+<aside class="art" aria-hidden="true">
+  <div class="sun"><div class="scan"></div><div class="pen"><i></i><i></i><i></i></div><div class="orbit" id="orbit"><i></i></div><div class="read"><b class="num" id="sunN">–</b><small id="sunL">&nbsp;</small></div></div>
+  <svg class="dots" viewBox="0 0 130 150"></svg>
+  <div class="blob2"></div>
+  <div class="blob"></div>
+</aside>
+
+<div class="content">
+  <header>
+    <div class="mark">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="18" r="11" fill="var(--coral)"/><circle cx="23.5" cy="8.5" r="5" fill="var(--violet)" stroke="var(--page)" stroke-width="2"/></svg>
+      <span>mywiki<em>.</em></span>
+    </div>
+    <nav aria-label="Sections">
+      <button data-v="now" aria-current="page" title="Ctrl+1">Now</button>
+      <button data-v="news" title="Ctrl+2">News</button>
+      <button data-v="research" title="Ctrl+3">Research</button>
+      <button data-v="export" title="Ctrl+4">Export<i class="due" id="exportDue" hidden></i></button>
+      <button data-v="settings" title="Ctrl+5">Settings</button>
+      <button class="theme" id="theme" type="button" aria-label="Switch light and dark"><svg><use href="#i-moon"/></svg></button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- NOW -->
+    <section class="view on" id="v-now" aria-live="polite">
+      <h1 id="headline">Opening…</h1>
+      <p class="lede" id="subline">&nbsp;</p>
+      <div class="bar"><i id="barFill"></i></div>
+      <div class="actions">
+        <button class="btn" id="runNow"><svg><use href="#i-play"/></svg><span>Run now</span></button>
+        <button class="link" id="openHome"><svg><use href="#i-open"/></svg>Open in Obsidian</button>
+      </div>
+
+      <h2>This run</h2>
+      <div class="steps-row" id="stations"></div>
+      <div class="now-item" id="nowItem" hidden></div>
+
+      <h2>Waiting</h2>
+      <div class="figures" id="backlog"></div>
+
+      <h2>Activity</h2>
+      <ul class="feed" id="feed"></ul>
+      <button class="link more" id="more" hidden>Show more</button>
+    </section>
+
+    <!-- NEWS: today's stories, headlines only until you pick one -->
+    <section class="view" id="v-news">
+      <h1>Today's news <em>discoveries and findings</em></h1>
+      <p class="lede" id="feedLede">Fresh stories across your fields, gathered once a day. Pick the ones you want and MyWiki reads them, looks into each topic and writes linked notes.</p>
+      <div class="chips segs" id="feedSegs"></div>
+      <ul class="news" id="feedList"></ul>
+      <div class="pickbar" id="pickBar" hidden><span id="pickN"></span><button type="button" class="link" id="pickClear">Clear</button><button type="button" class="btn" id="pickGo">Make notes</button></div>
+      <button class="link more" id="feedMore" type="button"><svg><use href="#i-open"/></svg>Fetch again</button>
+    </section>
+
+    <!-- RESEARCH -->
+    <section class="view" id="v-research">
+      <h1>Research a topic <em>or a post</em></h1>
+      <p class="lede">MyWiki asks <b>last30days</b> what people said on Reddit, Hacker News and GitHub, fills gaps from the web, writes a short brief, and links lasting facts into your notes. Paste links to videos, reels or shorts instead, and MyWiki gets what is said in them and turns it into linked notes.</p>
+      <form id="newsForm" autocomplete="off">
+        <label class="ask"><svg><use href="#i-search"/></svg><input id="topic" placeholder="Pick a topic, or paste links" maxlength="2000" required aria-label="Topic or links"></label>
+        <div class="opts">
+          <div class="seg" id="days" role="group" aria-label="Time window">
+            <button type="button" data-v="7">7 days</button><button type="button" data-v="30" aria-pressed="true">30 days</button><button type="button" data-v="90">90 days</button>
+          </div>
+          <div class="seg" id="depth" role="group" aria-label="Depth">
+            <button type="button" data-v="quick" aria-pressed="true">Quick</button><button type="button" data-v="default">Standard</button><button type="button" data-v="deep">Deep</button>
+          </div>
+          <button class="btn" id="newsGo">Research</button>
+        </div>
+        <div class="chips" id="suggest"></div>
+        <div class="links" id="linkBox" hidden>
+          <ul id="linkList"></ul>
+          <div class="opts"><span class="hint" id="linkHint"></span>
+            <button type="button" class="btn quiet" data-social="note">Just note it</button><button type="button" class="btn" data-social="research">Research &amp; note</button></div>
+        </div>
+      </form>
+      <div id="phoneBox" hidden>
+        <h2>From your phone</h2>
+        <ul class="news" id="phoneList"></ul>
+        <div class="formfoot"><button type="button" class="btn quiet" id="phoneAll">Preview all links</button><span class="hint">Tap a topic to research it.</span></div>
+      </div>
+      <h2>Followed</h2>
+      <ul class="stories" id="stories"></ul>
+    </section>
+
+    <!-- EXPORT -->
+    <section class="view" id="v-export">
+      <h1>Bring in your <em>Claude chats</em></h1>
+      <p class="lede">Claude Code, Devin, Antigravity and Quire are read from this PC on their own. Chats in the Claude app live in your account, so once a month you download them.</p>
+      <p class="state" id="exStatus"></p>
+      <ol class="steps">
+        <li><div>
+          <h3>Ask claude.ai for your data</h3>
+          <p>Settings, then Privacy, then <b>Export data</b>.</p>
+          <button class="btn quiet" id="openClaude"><svg><use href="#i-open"/></svg>Open claude.ai settings</button>
+        </div></li>
+        <li><div>
+          <h3>Download the zip from the email</h3>
+          <p>The link arrives within minutes, sometimes hours. It lands in Downloads.</p>
+          <button class="link" id="openDownloads"><svg><use href="#i-open"/></svg>Open Downloads</button>
+        </div></li>
+        <li><div>
+          <h3>Import it</h3>
+          <p>The next run reads only chats it has not seen before.</p>
+          <div class="drop" id="drop"><ul class="found" id="found"></ul><p class="hint" id="dropHint">Or drop the .zip here.</p></div>
+        </div></li>
+      </ol>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="view" id="v-settings">
+      <h1>Settings <em>for the agents</em></h1>
+      <p class="lede">Reading chats is bulk work, so a fast model is fine. Writing notes is where quality shows.</p>
+      <form id="setForm" onsubmit="return false">
+        <h2>Vault</h2>
+        <ul class="svc" id="svcVault"></ul>
+        <h2>Models</h2>
+        <div id="mcSettings"><p class="hint">Looking for agents…</p></div>
+        <h2>Web search</h2>
+        <p class="sum" id="searchSum">Checking…</p>
+        <ul class="svc" id="svcSearch"></ul>
+        <h2>Phone</h2>
+        <ul class="svc" id="svcPhone"></ul>
+        <h2>Social media</h2>
+        <p class="sum">Links to videos, reels and posts in Research are read with <b>yt-dlp</b>. Some sites only show posts to a logged-in person. To add a login: log in to the site in your browser yourself, export its cookies with the <b>Get cookies.txt LOCALLY</b> extension (Netscape format), then add the file here. MyWiki keeps it in <code>~/.mywiki/state</code>, outside your vault and git, and never sees your password.</p>
+        <ul class="svc" id="svcSocial"></ul>
+        <div class="formfoot"><label class="btn quiet"><input type="file" id="cookieFile" accept=".txt,text/plain" hidden>Add a login (cookies.txt)</label><span class="hint" id="cookieHint"></span></div>
+        <h2>News topics</h2>
+        <div id="topicsSettings"></div>
+        <h2>Tidy up the library</h2>
+        <div class="tidy" id="tidy"><p class="hint">Loading the plan…</p></div>
+        <h2>Schedule</h2>
+        <dl class="kv" id="kv"></dl>
+        <div class="sched" id="schedCtl"></div>
+        <div class="formfoot"><button type="button" class="link" id="openLogs"><svg><use href="#i-open"/></svg>Open the log folder</button><span class="hint">Your settings live in <code>~/.mywiki/config.json</code></span></div>
+      </form>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<div class="setup" id="setup" hidden role="dialog" aria-modal="true" aria-labelledby="suTitle">
+  <button type="button" class="link su-close" id="suClose" hidden>Close</button>
+  <div class="su">
+    <aside class="su-side">
+      <div class="mark"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="18" r="11" fill="var(--coral)"/><circle cx="23.5" cy="8.5" r="5" fill="var(--violet)" stroke="var(--page)" stroke-width="2"/></svg><span>mywiki<em>.</em></span></div>
+      <ol class="su-steps" id="suSteps"></ol>
+    </aside>
+    <div class="su-main">
+      <p class="su-k" id="suK"></p>
+      <h1 id="suTitle"></h1>
+      <p class="lede" id="suLede"></p>
+      <div class="su-body" id="suBody"></div>
+      <div class="formfoot su-foot"><button type="button" class="btn quiet" id="suBack">Back</button><button type="button" class="btn" id="suNext">Next</button>
+        <button type="button" class="link" id="suSkip">Skip for now</button><span class="hint" id="suHint"></span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const TOKEN = document.querySelector('meta[name=token]').content;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const json = r => { if (r.status === 403) location.reload(); return r.json(); };   // 403: MyWiki restarted with a new token; reloading picks it up
+const get = p => fetch(p, { headers: { 'X-Token': TOKEN } }).then(json);
+const post = (p, body = {}) => fetch(p, { method: 'POST', headers: { 'X-Token': TOKEN, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(json);
+let S = null, SIDE = null, view = 'now', feedAll = false;
+
+function toast(msg, bad) {
+  const t = $('#toast'); t.textContent = msg; t.classList.toggle('bad', !!bad); t.classList.add('on');
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), bad ? 6000 : 3200);
+}
+// the dot grid in the art panel: a staggered lattice, like the reference
+const dot = (r, c) => `${12 + c * 24 + (r % 2) * 12} ${10 + r * 21}`;   // 7 rows x 5 columns, odd rows shifted
+$('.dots').innerHTML = '<g class="web">' + [[[0, 1], [1, 2], [3, 1], [4, 3]], [[2, 4], [3, 3], [5, 2], [6, 0]], [[1, 0], [2, 1], [4, 0], [6, 2]], [[0, 4], [2, 3], [4, 4], [5, 3]]]
+  .map((pts, k) => `<path pathLength="1" style="--k:${k}" d="M${pts.map(([r, c]) => dot(r, c)).join(' L')}"/>`).join('') + '</g>' +
+  Array.from({ length: 7 }, (_, r) => Array.from({ length: 5 }, (_, c) => `<circle cx="${dot(r, c).split(' ')[0]}" cy="${10 + r * 21}" r="2.6" style="--r:${r};--c:${c};--i:${r * 5 + c}"/>`).join('')).join('');
+
+/* ---------- light / dark: follows the system until chosen, then remembered ---------- */
+const dark = () => (document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
+function paintTheme() { $('#theme use').setAttribute('href', dark() ? '#i-sun' : '#i-moon'); }
+try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+$('#theme').onclick = () => {
+  const t = dark() ? 'light' : 'dark'; document.documentElement.dataset.theme = t; paintTheme();
+  try { localStorage.setItem('theme', t); } catch (e) {}
+};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintTheme);
+paintTheme();
+
+/* ---------- sections ---------- */
+function go(v) {
+  if (v === view) return;
+  document.querySelectorAll('section.view').forEach(s => s.classList.toggle('on', s.id === 'v-' + v));
+  document.querySelectorAll('nav [data-v]').forEach(b => b.dataset.v === v ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
+  view = v; scrollTo(0, 0);
+  if (v === 'research' || v === 'export' || v === 'settings') loadSide();
+  if (v === 'news') loadFeed();
+  if (v === 'settings') { loadSettings(); loadServices(); }
+  if (v === 'research') loadPhone();
+}
+document.querySelectorAll('nav [data-v]').forEach(b => b.onclick = () => go(b.dataset.v));
+addEventListener('keydown', e => {
+  if (!e.ctrlKey || e.altKey) return;
+  const v = ['now', 'news', 'research', 'export', 'settings'][+e.key - 1]; if (v) { e.preventDefault(); go(v); }
+});
+
+/* ---------- words ---------- */
+const STAGES = { run: ['harvest', 'extract', 'integrate', 'connect', 'migrate', 'save'], news: ['research', 'brief', 'integrate', 'connect', 'save'], consolidate: ['consolidate'], capture: ['research', 'integrate', 'connect', 'save'], social: ['research', 'brief', 'integrate', 'connect', 'save'] };
+const W = {
+  harvest: { name: 'Collect', noun: 'sources', doing: 'Collecting' },
+  extract: { name: 'Find', noun: 'chats', doing: 'Finding knowledge' },
+  integrate: { name: 'Write', noun: 'card sets', doing: 'Writing notes' },
+  migrate: { name: 'Tidy', noun: 'notes', doing: 'Tidying notes' },
+  save: { name: 'Save', noun: '', doing: 'Saving' },
+  research: { name: 'Search', noun: 'results', doing: 'Searching' },
+  brief: { name: 'Brief', noun: '', doing: 'Writing the brief' },
+  connect: { name: 'Connect', noun: 'connections', doing: 'Linking ideas' },
+  consolidate: { name: 'Tidy up', noun: 'topic notes', doing: 'Folding notes into topics' },
+};
+const fmtDur = s => s < 60 ? 'under a minute' : s < 3600 ? `about ${Math.round(s / 60)} min` : `about ${Math.floor(s / 3600)} h ${Math.round(s % 3600 / 60)} min`;
+const clock = iso => iso ? iso.slice(11, 16) : '';
+function nextRun(s) {   // the server sends "07-10-2026 11:00" (day first)
+  const m = /(\d{2})[-/.](\d{2})[-/.](\d{4}) (\d{2}):(\d{2})/.exec(s || ''); if (!m) return s && s !== 'N/A' ? s : '';
+  const d = new Date(+m[3], m[2] - 1, +m[1], +m[4], +m[5]), today = new Date(); today.setHours(0, 0, 0, 0);
+  const days = Math.round((new Date(d).setHours(0, 0, 0, 0) - today) / 864e5), hm = `${m[4]}:${m[5]}`;
+  return days === 0 ? `today at ${hm}` : days === 1 ? `tomorrow at ${hm}` : `${d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })} at ${hm}`;
+}
+function since(ts) { const s = Math.max(0, Date.now() / 1000 - ts); return s < 60 ? `${Math.round(s)} s` : s < 3600 ? `${Math.floor(s / 60)} min` : `${Math.floor(s / 3600)} h ${Math.floor(s % 3600 / 60)} min`; }
+
+/* ---------- NOW ---------- */
+let order = [];
+function buildStations(kind) {
+  const ids = STAGES[kind];
+  if (ids.join() === order.join()) return;
+  order = ids;
+  const box = $('#stations'); box.style.setProperty('--n', ids.length);
+  box.innerHTML = ids.map(id => `<div class="st" data-id="${id}" data-s="waiting"><span class="name">${W[id].name}</span><span class="count num"></span></div>`).join('');
+}
+function sun(frac, n, label) {   // the violet moon travels the visible half of the sun, top to bottom
+  $('#orbit').style.transform = `rotate(${24 + 132 * frac}deg)`;
+  $('#sunN').innerHTML = n; $('#sunL').textContent = label;
+  $('#barFill').style.transform = `scaleX(${Math.max(.04, frac)})`;
+}
+
+function renderNow() {
+  const p = S.progress || {}, st = p.stages || {}, kind = p.kind || 'run';
+  buildStations(kind);
+  const cur = S.running ? p.current : null;
+  let overall = 0;
+  order.forEach((id, i) => {
+    const el = document.querySelector(`.st[data-id="${id}"]`), s = st[id] || {};
+    let state = s.state || 'waiting';
+    if (!S.running && state === 'running') state = 'failed';   // a run that died mid-stage
+    if (state === 'done' && s.failed) state = 'partial';
+    el.dataset.s = state;
+    el.querySelector('.count').innerHTML = s.total ? `${s.done} of ${s.total}${s.failed ? ` · <span class="bad">${s.failed} failed</span>` : ''}` :
+      state === 'done' ? 'Done' : state === 'running' ? 'Working' : state === 'stopped' ? 'Stopped' : state === 'failed' ? 'Interrupted' : 'Waiting';
+    const frac = ['done', 'partial'].includes(state) ? 1 : s.total ? Math.min(1, s.done / s.total) : 0;
+    el.style.setProperty('--f', frac);
+    if (['done', 'partial'].includes(state)) overall = i + 1;
+    else if (state === 'running') overall = i + frac;
+  });
+
+  const h = $('#headline'), sub = $('#subline'), q = S.queue, waiting = q.chats + q.cards;
+  if (S.running && cur) {
+    const s = st[cur] || {}, w = W[cur] || {}, f = overall / order.length;
+    h.innerHTML = kind === 'social' && ['research', 'brief'].includes(cur) ? `${cur === 'research' ? 'Getting the words' : 'Reading and checking'}<em>${esc(((p.stages || {}).research || {}).unit || p.topic || '')}</em>` : kind === 'capture' && ['research', 'brief'].includes(cur) ? `Reading and searching<em>${esc(p.topic || '')}</em>` : kind === 'news' && cur === 'research' ? `Researching<em>${esc(p.topic || '')}</em>` : `${esc(w.doing || 'Working')}<em>step ${order.indexOf(cur) + 1} of ${order.length}</em>`;
+    const parts = [];
+    if (s.total) parts.push(`<b class="num">${s.done} of ${s.total}</b> ${w.noun}`);
+    if (s.eta > 0) parts.push(`${fmtDur(s.eta)} left`);
+    if (p.started) parts.push(`running for ${since(p.started)}`);
+    sub.innerHTML = parts.join(' · ') || 'Starting…';
+    const note = f => f.split('/').pop().replace(/\.md$/, '').replace(/-/g, ' ');
+    const rows = cur === 'integrate' ? [['Reading', s.reading || []], ['Just wrote', (s.wrote || []).map(note)]] :
+      cur === 'connect' && s.unit && s.unit.endsWith('.md') ? [['Wrote', [note(s.unit)]]] :
+      [['Latest', [s.label || (s.unit && !s.unit.endsWith('.md') ? s.unit : '')].filter(Boolean)]];
+    const html = rows.filter(r => r[1].length).map(([k, v]) => `<span>${k}</span><div>${v.map(x => `<b>${esc(x)}</b>`).join('')}</div>`).join('');
+    $('#nowItem').hidden = !html; $('#nowItem').innerHTML = html;
+    sun(f, `${Math.round(100 * f)}<span>%</span>`, 'done');
+  } else {
+    const last = S.last_run || {}, ok = (last.result || 'ok') === 'ok';
+    h.innerHTML = waiting ? `Resting for now<em>${waiting} pieces to go</em>` : 'Everything read<em>all caught up</em>';
+    sub.innerHTML = [nextRun(S.next_run) ? `Next run <b>${esc(nextRun(S.next_run))}</b>` : '',
+      last.at ? `last ran ${esc(last.at)}${ok ? '' : ' <span style="color:var(--red)">and stopped with an error</span>'}` : ''].filter(Boolean).join(' · ');
+    $('#nowItem').hidden = true;
+    sun(waiting ? 0 : 1, waiting, waiting ? 'to go' : 'caught up');
+  }
+  $('#runNow').disabled = S.running;
+  document.body.classList.toggle('running', !!S.running);
+  document.body.dataset.stage = S.running && cur || '';
+  $('#runNow use').setAttribute('href', S.running ? '#i-spin' : '#i-play');
+  $('#runNow span').textContent = S.running ? 'Running…' : 'Run now';
+
+  const runs = Math.ceil(q.chats / Math.max(1, (S.limits || {}).max_extract_per_run || 30));
+  const fig = (v, l) => `<div><b class="num">${v}</b><small>${l}</small></div>`;
+  $('#backlog').innerHTML = fig(q.chats, 'chat pieces to read') + fig(q.cards, 'card sets to write') +
+    fig(`${q.tidy_done}<span> / ${q.tidy_total}</span>`, 'older notes tidied') + fig(runs ? '~' + runs : 0, q.failed ? `runs left · ${q.failed} set aside` : 'daily runs to clear');
+
+  // activity: newest first, only new rows animate in
+  const all = S.events.slice(-40).reverse(), list = feedAll ? all : all.slice(0, 6), feed = $('#feed'), sig = list.map(e => e.at + e.text).join('|');
+  $('#more').hidden = feedAll || all.length <= 6;
+  if (!list.length) feed.innerHTML = '<li class="empty">Nothing yet today.</li>';
+  else if (feed.dataset.sig !== sig) {
+    const have = new Set([...feed.children].map(li => li.dataset.k)), first = !feed.dataset.sig;
+    feed.innerHTML = list.map(e => {
+      const k = e.at + e.text;
+      return `<li data-k="${esc(k)}" class="${e.kind}${first || have.has(k) ? '' : ' new'}"><time class="num">${clock(e.at)}</time>
+        <div class="x"><div title="${esc(e.text)}">${esc(e.text)}</div>${e.note ? `<small>${esc(e.note)}${e.tries ? ` · try ${e.tries} of 3` : ''}</small>` : ''}</div></li>`;
+    }).join('');
+    feed.dataset.sig = sig;
+  }
+}
+$('#more').onclick = () => { feedAll = true; renderNow(); };
+
+/* ---------- toggles ---------- */
+function seg(id, onChange) {
+  const box = $(id);
+  box.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    box.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    onChange && onChange(b.dataset.v);
+  });
+  return () => box.querySelector('[aria-pressed="true"]').dataset.v;
+}
+
+/* ---------- model picker: every model, searchable, any typed id ---------- */
+function picker(root) {
+  root.innerHTML = `<button type="button" aria-haspopup="listbox"><span>Loading…</span><svg><use href="#i-down"/></svg></button>
+    <div class="pop" hidden><input placeholder="Search, or type any model id" spellcheck="false"><ul role="listbox"></ul><div class="count"></div></div>`;
+  const btn = root.querySelector('button'), pop = root.querySelector('.pop'), q = pop.querySelector('input'), ul = pop.querySelector('ul');
+  let models = [], value = '', hi = 0;
+  const show = () => {
+    const t = q.value.trim().toLowerCase();
+    const list = models.filter(m => !t || m.id.toLowerCase().includes(t) || m.name.toLowerCase().includes(t));
+    const typed = t && !models.some(m => m.id.toLowerCase() === t) ? [{ id: q.value.trim(), name: 'Use this id as typed' }] : [];
+    const rows = [...list, ...typed]; hi = Math.max(0, Math.min(hi, rows.length - 1));
+    ul.innerHTML = rows.map((m, i) => `<li role="option" data-id="${esc(m.id)}" aria-selected="${m.id === value}" class="${i === hi ? 'on' : ''}">${esc(m.id)}${m.name && m.name !== m.id ? `<small>${esc(m.name)}</small>` : ''}</li>`).join('');
+    pop.querySelector('.count').textContent = `${list.length} of ${models.length} models`;
+  };
+  const close = () => { pop.hidden = true; root.classList.remove('open'); };
+  const choose = id => { value = id; btn.querySelector('span').textContent = id || 'Choose a model'; close(); };
+  btn.onclick = () => {
+    if (!pop.hidden) return close();
+    pop.hidden = false; root.classList.add('open'); q.value = ''; hi = Math.max(0, models.findIndex(m => m.id === value)); show(); q.focus();
+    ul.querySelector('.on')?.scrollIntoView({ block: 'nearest' });
+  };
+  q.oninput = () => { hi = 0; show(); };
+  q.onkeydown = e => {
+    const n = ul.children.length;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); hi = (hi + (e.key === 'ArrowDown' ? 1 : n - 1)) % Math.max(1, n); show(); ul.querySelector('.on')?.scrollIntoView({ block: 'nearest' }); }
+    else if (e.key === 'Enter') { e.preventDefault(); const li = ul.children[hi]; if (li) { choose(li.dataset.id); btn.focus(); } }
+    else if (e.key === 'Escape') { close(); btn.focus(); }
+  };
+  ul.onclick = e => { const li = e.target.closest('li'); if (li) { choose(li.dataset.id); btn.focus(); } };
+  document.addEventListener('pointerdown', e => { if (!root.contains(e.target)) close(); });
+  return { set(list, v) { models = list; choose(v); }, get: () => value };
+}
+
+/* ---------- NEWS + EXPORT ---------- */
+async function loadSide(force) {
+  if (!SIDE || force || Date.now() - SIDE._at > 30000) { SIDE = await get('/api/side'); SIDE._at = Date.now(); }
+  renderNews(); renderExport(); renderTidy();
+}
+const days = seg('#days'), depth = seg('#depth');
+const links = () => [...new Set($('#topic').value.match(/(?:https?:\/\/|photo:)[^\s,]+/g) || [])].slice(0, 10);
+let LINKS = [];
+$('#topic').addEventListener('input', () => {
+  const n = links().length;
+  $('#newsGo').textContent = n ? 'Preview' : 'Research'; $('#days').hidden = $('#depth').hidden = !!n;
+  if (!n) $('#linkBox').hidden = true;
+});
+const mins = s => !s ? '' : s < 60 ? `${s} s` : `${Math.round(s / 60)} min`;
+async function previewLinks() {
+  const urls = links(); LINKS = [];
+  $('#linkBox').hidden = false; $('#linkHint').textContent = '';
+  $('#linkList').innerHTML = urls.map(u => `<li><span class="noimg"></span><b>${esc(u)}</b><small>Looking at the post…</small></li>`).join('');
+  const got = await Promise.all(urls.map(u => post('/api/link', { url: u }).catch(() => ({ ok: false, error: 'No answer from MyWiki.' }))));
+  $('#linkList').innerHTML = got.map((x, n) => x.ok ? `<li>${x.thumb ? `<img src="${esc(x.thumb)}" alt="" referrerpolicy="no-referrer" onerror="this.className='noimg';this.removeAttribute('src')">` : '<span class="noimg"></span>'}
+      <b>${esc(x.title)}</b><small>${esc([x.site, x.channel, x.date, mins(x.duration)].filter(Boolean).join(' · '))}</small>
+      <span class="how">${x.kind === 'image' ? 'Photo: the model looks at it' : x.kind === 'article' ? 'Page: reads its text and looks at its pictures' : (x.subs.length ? 'Reads the subtitles' : `Turns the speech into text${x.duration > 300 ? ` (about ${Math.ceil(x.duration / 300)} min)` : ''}`) + ', looks at the caption, pictures and video stills'}</span></li>`
+    : `<li><span class="noimg"></span><b>${esc(urls[n])}</b><span class="bad">${esc(x.error)}</span></li>`).join('');
+  LINKS = urls.filter((u, n) => got[n].ok);
+  $('#linkHint').textContent = LINKS.length ? (LINKS.length < urls.length ? `${LINKS.length} of ${urls.length} links can be read.` : '') : 'None of these links can be read.';
+  document.querySelectorAll('[data-social]').forEach(b => b.disabled = !LINKS.length);
+}
+$('#linkBox').addEventListener('click', async e => {
+  const b = e.target.closest('[data-social]'); if (!b || !LINKS.length) return;
+  if (S && S.running) return toast('A run is going. Try again when it finishes.', true);
+  const r = await post('/api/social', { urls: LINKS, mode: b.dataset.social });
+  if (!r.ok) return toast(r.error, true);
+  toast(`Making notes from ${LINKS.length === 1 ? 'this post' : `${LINKS.length} posts`}. Follow it on Now.`); loadPhone();
+  $('#topic').value = ''; $('#topic').dispatchEvent(new Event('input')); go('now');
+});
+$('#newsForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (links().length) return previewLinks();
+  const topic = $('#topic').value.trim(); if (topic.length < 2) return;
+  if (topic.length > 120) return toast('Keep a topic under 120 characters.', true);
+  if (S && S.running) return toast('A run is going. Research when it finishes.', true);
+  const r = await post('/api/news', { topic, days: +days(), depth: depth() });
+  if (!r.ok) return toast(r.error, true);
+  toast(`Researching “${topic}”.`); go('now');
+});
+async function loadPhone() {
+  const r = await get('/api/phone-queue').catch(() => null); if (!r) return;
+  const q = r.queue || [];
+  $('#phoneBox').hidden = !q.length;
+  $('#phoneList').innerHTML = q.map(x => `<li><span class="seg-l">${x.kind === 'topic' ? 'Topic' : esc(x.site || 'Link')}</span>
+    <a data-use="${esc(x.text)}" data-kind="${x.kind}" title="${x.kind === 'topic' ? 'Research this topic' : 'Preview this link'}">${esc(x.title)}</a>
+    <div class="act"><button type="button" class="link" data-drop="${esc(x.text)}">Remove</button></div><small>${esc(x.at || '')}</small></li>`).join('');
+}
+$('#phoneList').onclick = async e => {
+  const d = e.target.closest('[data-drop]'); if (d) { await post('/api/phone-drop', { text: d.dataset.drop }); return loadPhone(); }
+  const a = e.target.closest('[data-use]'); if (!a) return;
+  $('#topic').value = a.dataset.use; $('#topic').dispatchEvent(new Event('input'));
+  if (a.dataset.kind === 'topic') $('#topic').focus(); else previewLinks();
+};
+$('#phoneAll').onclick = async () => {
+  const r = await get('/api/phone-queue'); const urls = (r.queue || []).filter(x => x.kind !== 'topic').map(x => x.text);
+  if (!urls.length) return toast('Only topics are waiting. Tap one to research it.', true);
+  $('#topic').value = urls.join(' '); $('#topic').dispatchEvent(new Event('input')); previewLinks();
+};
+function renderNews() {
+  const topics = [...new Set(SIDE.news.map(n => n.topic))].slice(0, 8);
+  $('#suggest').innerHTML = topics.map(s => `<button type="button">${esc(s)}</button>`).join('');
+  $('#suggest').onclick = e => { const b = e.target.closest('button'); if (b) { $('#topic').value = b.textContent; $('#topic').focus(); } };
+  $('#stories').innerHTML = SIDE.news.map(n => `<li><button data-news="${esc(n.page)}"><b>${esc(n.topic)}</b><time class="num">${esc(n.date)}</time><p>${esc(n.brief)}</p></button></li>`).join('')
+    || '<li class="empty">Nothing yet. Your first topic appears here with its brief.</li>';
+  $('#stories').onclick = e => { const b = e.target.closest('[data-news]'); if (b) post('/api/open', { what: 'news', arg: b.dataset.news }); };
+}
+let FEED = null, feedSeg = 'All', picked = new Set();
+async function loadFeed() {
+  FEED = await get('/api/feed').catch(() => null); renderFeed();
+  if (FEED && FEED.fetching && view === 'news') setTimeout(loadFeed, 3000);
+}
+const ago = d => { const t = new Date(); t.setHours(0, 0, 0, 0); const n = Math.round((t - new Date(d + 'T00:00')) / 864e5); return !d ? '' : n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`; };
+function renderFeed() {
+  const items = (FEED && FEED.items) || [], segs = ['All', ...new Set(items.map(i => i.segment))];
+  if (!segs.includes(feedSeg)) feedSeg = 'All';
+  $('#feedSegs').innerHTML = items.length ? segs.map(x => `<button type="button" data-seg="${esc(x)}" aria-pressed="${x === feedSeg}">${esc(x)}</button>`).join('') : '';
+  $('#feedLede').innerHTML = FEED && FEED.fetching ? "Gathering today's stories…" : `Fresh stories across your fields${FEED && FEED.date ? `, gathered <b>${esc(ago(FEED.date))}</b>` : ''}. Pick the ones you want and MyWiki reads them, looks into each topic and writes linked notes.`;
+  const busy = S && S.running && (S.progress || {}).kind === 'capture' ? (S.progress || {}).stories || [] : [];
+  for (const u of picked) if (!items.some(i => i.url === u && !i.noted)) picked.delete(u);
+  $('#feedList').innerHTML = items.filter(i => feedSeg === 'All' || i.segment === feedSeg).map(i => `<li>
+    <span class="seg-l">${esc(i.segment)}</span>
+    <a data-url="${esc(i.url)}" title="Open the story">${esc(i.title)}</a>
+    <div class="act">${i.noted ? `<span class="done">${i.noted === 'nothing new' ? 'Nothing new to keep' : 'Noted in ' + esc(i.noted)}</span>`
+      : busy.includes(i.url) ? '<span class="done">Writing the note…</span>' : `<label class="pick"><input type="checkbox" data-pick="${esc(i.url)}"${picked.has(i.url) ? ' checked' : ''}>Pick</label>`}</div>
+    <p>${esc(i.summary)}</p><small>${esc(i.source.replace(/^www\./, ''))} · ${esc(ago(i.published_at))}</small></li>`).join('')
+    || `<li class="empty">${FEED && FEED.fetching ? 'Gathering…' : 'No stories yet. Press Fetch again.'}</li>`;
+  renderPick();
+}
+function renderPick() {
+  $('#pickBar').hidden = !picked.size;
+  $('#pickN').textContent = `${picked.size} ${picked.size === 1 ? 'story' : 'stories'} picked`;
+}
+$('#feedSegs').onclick = e => { const b = e.target.closest('[data-seg]'); if (b) { feedSeg = b.dataset.seg; renderFeed(); } };
+$('#feedList').onclick = async e => {
+  const a = e.target.closest('[data-url]'); if (a) return post('/api/open', { what: 'story', arg: a.dataset.url });
+  const c = e.target.closest('[data-pick]'); if (!c) return;
+  c.checked ? picked.add(c.dataset.pick) : picked.delete(c.dataset.pick); renderPick();
+};
+$('#pickClear').onclick = () => { picked.clear(); renderFeed(); };
+$('#pickGo').onclick = async () => {
+  if (S && S.running) return toast('A run is going. Make the notes when it finishes.', true);
+  const r = await post('/api/capture', { urls: [...picked] });
+  r.ok ? (toast(`Writing notes from ${picked.size} ${picked.size === 1 ? 'story' : 'stories'}. Follow it on Now.`), picked.clear(), go('now')) : toast(r.error, true);
+};
+$('#feedMore').onclick = async () => { await post('/api/feed'); loadFeed(); };
+function renderTidy() {
+  const t = SIDE.tidy || {}, box = $('#tidy');
+  box.innerHTML = t.finished ? `<p><b>Done.</b> Chat notes were folded into ${t.groups} topic notes; tool and trivia notes were removed.</p>`
+    : t.groups ? `<p>Fold <b>${t.fold}</b> small chat notes into <b>${t.groups}</b> topic notes, and delete <b>${t.delete}</b> tool and trivia notes. Links are moved to the topic notes. Your hand-written notes are not touched; the vault is saved to git first.${t.done ? ` ${t.done} of ${t.groups} done.` : ''}</p><button type="button" class="btn" id="tidyGo">Tidy up now</button>`
+    : '<p>No tidy-up plan.</p>';
+  const b = $('#tidyGo'); if (b) b.onclick = async () => {
+    if (S && S.running) return toast('A run is going. Tidy up when it finishes.', true);
+    const r = await post('/api/consolidate'); r.ok ? (toast('Tidying up. Follow it on Now.'), go('now')) : toast(r.error, true);
+  };
+}
+function renderExport() {
+  const x = SIDE.export, s = $('#exStatus');
+  $('#exportDue').hidden = !x.due;
+  s.classList.toggle('due', !!x.due || !x.last);
+  s.innerHTML = x.last
+    ? `<i></i><b>${x.due ? 'Due.' : 'Up to date.'}</b> Last imported ${esc(x.last)}, ${x.days} day${x.days === 1 ? '' : 's'} ago.`
+    : `<i></i><b>Never imported.</b> Your Claude app chats are not in the wiki yet.`;
+  $('#found').innerHTML = x.found.map(f => `<li><span><b>${esc(f.name)}</b> <span class="hint">· ${f.mb} MB · ${esc(f.date)}</span></span><button class="btn" data-import="${esc(f.path)}">Import</button></li>`).join('');
+  $('#dropHint').textContent = x.found.length ? 'Or drop a different .zip here.' : 'Nothing in Downloads yet. It shows up here when it arrives, or drop it here.';
+}
+$('#found').addEventListener('click', async e => {
+  const b = e.target.closest('[data-import]'); if (!b) return;
+  b.disabled = true; b.textContent = 'Importing…';
+  const r = await post('/api/import', { path: b.dataset.import });
+  r.ok ? toast('Imported. The next run reads the new chats.') : toast(r.error, true);
+  loadSide(true);
+});
+const drop = $('#drop');
+['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', async e => {
+  const f = e.dataTransfer.files[0]; if (!f) return;
+  toast(`Importing ${f.name}…`);
+  const r = await fetch('/api/upload', { method: 'POST', headers: { 'X-Token': TOKEN, 'X-Filename': f.name }, body: f }).then(r => r.json());
+  r.ok ? toast('Imported. The next run reads the new chats.') : toast(r.error, true);
+  loadSide(true);
+});
+$('#openClaude').onclick = () => post('/api/open', { what: 'claude-export' });
+$('#openDownloads').onclick = () => post('/api/open', { what: 'downloads' });
+
+/* ---------- SETTINGS ---------- */
+async function loadSettings() {
+  if (!S) return;
+  const l = S.limits || {}, kv = (k, v) => `<div><dt>${k}</dt><dd>${v}</dd></div>`, sc = S.schedule || {};
+  $('#kv').innerHTML = kv('Daily', sc.on ? `${esc(sc.time || '11:00')}, or soon after the computer wakes${nextRun(S.next_run) ? ` · next ${esc(nextRun(S.next_run))}` : ''}` : 'Off: runs only when you press Run now') +
+    kv('Per run', `${l.max_extract_per_run} chat pieces read, ${l.max_integrate_per_run} card sets written`) +
+    kv('At once', `${l.extract_workers} chats read, ${l.integrate_workers} note sets written`);
+  const su = await get('/api/setup');
+  const v = su.vault;
+  $('#svcVault').innerHTML = `<li><span class="st ${v.exists && v.ready ? 'ok' : 'bad'}"></span><div><span class="lbl">${esc(v.path || 'No vault yet')}</span>
+    <p class="say">${v.exists ? `${v.notes} notes${v.git ? ' · saved to git after each run' : ' · not a git repository, so runs are not saved to git'}${v.obsidian ? ' · opens in Obsidian' : ''}` : 'Not found. Choose a vault.'}</p></div><div></div>
+    <div class="ctl"><button type="button" class="btn quiet" data-su="0">Change vault</button><button type="button" class="link" data-su="1">Run setup again</button></div></li>`;
+  schedCtl($('#schedCtl'), su, true);
+  renderMC($('#mcSettings'));
+  renderTopics($('#topicsSettings'), su, true);
+}
+$('#svcVault').addEventListener('click', e => { const b = e.target.closest('[data-su]'); if (b) openSetup(0); });
+
+/* ---------- daily run: on/off and the time ---------- */
+function schedCtl(box, su, withSave) {
+  const sc = su.schedule || {}, stale = sc.on && su.task_target && su.task_target.toLowerCase() !== su.app.toLowerCase();
+  box.innerHTML = `<label><input type="checkbox" id="${box.id}On"${sc.on !== false ? ' checked' : ''}>Run every day at</label>
+    <input type="time" id="${box.id}At" value="${esc(sc.time || '11:00')}" aria-label="Time of the daily run">
+    ${withSave ? `<button type="button" class="btn quiet" id="${box.id}Save">Save</button>` : ''}
+    ${su.next_run ? `<span class="hint">Next: ${esc(su.next_run)}</span>` : ''}
+    ${stale ? `<p class="warnline" style="flex-basis:100%">The daily run still starts an older copy (${esc(su.task_target)}). Save to point it at this app.</p>` : ''}`;
+  if (withSave) $('#' + box.id + 'Save').onclick = async () => {
+    const r = await saveSched(box); r.ok ? toast('Daily run saved.') : toast(r.error, true); poll(); loadSettings();
+  };
+}
+const saveSched = box => post('/api/schedule', { on: $('#' + box.id + 'On').checked, time: $('#' + box.id + 'At').value || '11:00' });
+
+/* ---------- news topics: suggestions plus your own, up to the cap ---------- */
+function renderTopics(box, su, withSave) {
+  const sel = new Set(su.topics_chosen ? su.topics : []), all = [...new Set([...su.suggestions, ...sel])];
+  const draw = () => {
+    const have = Object.values(su.searches || {}).reduce((a, b) => a + b, 0), names = Object.keys(su.searches || {}).join(' + ') || 'none';
+    box.innerHTML = `<p class="sum"><b>${sel.size}</b> chosen: each morning that is <b>${sel.size}</b> web ${sel.size === 1 ? 'search' : 'searches'} and <b>${sel.size}</b> model ${sel.size === 1 ? 'call' : 'calls'}.
+      You have <b>${have}</b> searches a day (${esc(names)}), shared with research.${sel.size > have ? ' Past that, the model searches by itself: it still works, just slower.' : ''}</p>
+      <div class="chips">${all.map(t => `<button type="button" class="chip" data-t="${esc(t)}" aria-pressed="${sel.has(t)}"${!sel.has(t) && sel.size >= su.topics_max ? ' disabled' : ''}>${esc(t)}</button>`).join('')}</div>
+      <div class="vrow" style="margin-top:18px"><input class="field" placeholder="Add your own topic, e.g. Indian classical music" maxlength="60" data-add aria-label="Your own topic"><button type="button" class="btn quiet" data-addb>Add</button>
+      ${withSave ? '<button type="button" class="btn" data-saveb>Save topics</button>' : ''}</div>`;
+  };
+  box.topics = () => [...sel];
+  box.onclick = async e => {
+    const c = e.target.closest('[data-t]');
+    if (c) { sel.has(c.dataset.t) ? sel.delete(c.dataset.t) : sel.add(c.dataset.t); return draw(); }
+    if (e.target.closest('[data-addb]')) {
+      const t = box.querySelector('[data-add]').value.trim(); if (t.length < 2) return;
+      if (sel.size >= su.topics_max) return toast(`Up to ${su.topics_max} topics. Turn one off first.`, true);
+      if (!all.includes(t)) all.push(t); sel.add(t); return draw();
+    }
+    if (e.target.closest('[data-saveb]')) { const r = await post('/api/topics', { topics: [...sel] }); r.ok ? toast('Topics saved. Tomorrow\'s news uses them.') : toast(r.error, true); }
+  };
+  box.onkeydown = e => { if (e.key === 'Enter' && e.target.matches('[data-add]')) { e.preventDefault(); box.querySelector('[data-addb]').click(); } };
+  draw();
+}
+
+/* ---------- model center: agents found here, APIs, local models; test before use ---------- */
+let MC = null;
+const mcName = c => c ? `${(MC.list.find(x => x.id === c.via) || {}).name || c.via} · ${c.model}` : '';
+const mcTest = (via, model) => MC.tests[`${via}|${model}`];
+async function renderMC(box) {
+  MC = await get('/api/model-center');
+  const m = MC.models, d = m.default, usable = x => x.kind === 'cli' ? x.found : x.kind === 'key' ? x.key : x.kind === 'local' ? true : !!x.base;
+  const lastTest = id => Object.entries(MC.tests).filter(([k]) => k.split('|')[0] === id).sort((a, b) => a[1].at < b[1].at ? 1 : -1)[0];
+  const current = id => [m.default, m.extract, m.integrate].find(c => c && c.via === id)?.model || (lastTest(id) || [''])[0].split('|').slice(1).join('|');
+  const row = x => {
+    const lt = lastTest(x.id), u = usable(x), isDef = d && d.via === x.id;
+    let st = '', say = '';
+    if (x.kind === 'cli') { st = x.found ? 'ok' : ''; say = x.found ? `Found on this computer. ${esc(x.sign_in)}` : 'Not installed on this computer.'; }
+    else if (x.kind === 'key') { st = x.key ? 'ok' : ''; say = x.key ? 'Key saved on this computer.' : 'Add an API key to use it.'; }
+    else if (x.kind === 'local') { st = lt ? (lt[1].ok ? 'ok' : 'bad') : ''; say = `Runs on this computer at <code>${esc(x.base)}</code>. Start ${esc(x.name)} and load a model first; free and private.`; }
+    else { st = x.base ? 'ok' : ''; say = x.base ? `Server at <code>${esc(x.base)}</code>.` : 'Any server that speaks the OpenAI chat API (vLLM, LiteLLM, Together, Mistral…).'; }
+    if (lt && !lt[1].ok && x.kind !== 'local' && u) st = 'bad';
+    const tested = lt ? `<p class="tested ${lt[1].ok ? 'ok' : 'bad'}">${lt[1].ok ? '✓' : '✗'} ${esc(lt[0].split('|').slice(1).join('|'))}: ${esc(lt[1].msg)} <span class="hint">(${esc(lt[1].at)})</span></p>` : '';
+    const ctl = [
+      u ? `<div class="pick" data-via="${esc(x.id)}" data-cur="${esc(current(x.id))}"></div><button type="button" class="btn quiet" data-mc="test">Test</button><button type="button" class="btn${isDef ? ' quiet' : ''}" data-mc="use">${isDef ? 'Default' : 'Use as default'}</button>` : '',
+      x.kind === 'key' ? `<input type="password" placeholder="${x.key ? 'Paste a new key to replace it' : 'Paste the API key'}" data-mc-key autocomplete="off" aria-label="${esc(x.name)} key"><button type="button" class="btn quiet" data-mc="key">Save key</button>${x.key ? '<button type="button" class="link" data-mc="rmkey">Remove key</button>' : ''}` : '',
+      x.kind === 'custom' || x.kind === 'local' ? `<input type="text" class="field" style="height:38px;width:260px" placeholder="http://host:port/v1" value="${esc(x.base)}" data-mc-base aria-label="${esc(x.name)} address"><button type="button" class="btn quiet" data-mc="base">Save address</button>` : '',
+      x.kind === 'custom' ? `<input type="password" placeholder="Key (if it needs one)" data-mc-key autocomplete="off" aria-label="Key"><button type="button" class="btn quiet" data-mc="key">Save key</button>` : '',
+      x.site ? `<button type="button" class="link" data-mc="site">${x.kind === 'key' && !x.key ? 'Get a key' : x.found || x.kind !== 'cli' ? 'Website' : 'How to install'}</button>` : '',
+    ].join('');
+    return `<li data-id="${esc(x.id)}" class="${u ? '' : 'off'}"><span class="st ${st}"></span><div><span class="lbl">${esc(x.name)}${isDef ? '<span class="use">DEFAULT</span>' : ''}</span><p class="say">${say}</p>${tested}</div><div></div><div class="ctl">${ctl}</div></li>`;
+  };
+  const combos = [...new Set([...Object.entries(MC.tests).filter(([, t]) => t.ok).map(([k]) => k), ...[m.extract, m.integrate].filter(Boolean).map(c => `${c.via}|${c.model}`)])];
+  const opt = (cur) => `<option value="">Same as the default${d ? ` (${esc(mcName(d))})` : ''}</option>` +
+    combos.map(k => { const [via, ...mm] = k.split('|'), c = { via, model: mm.join('|') }; return `<option value="${esc(k)}"${cur && `${cur.via}|${cur.model}` === k ? ' selected' : ''}>${esc(mcName(c))}</option>`; }).join('');
+  const cli = MC.list.filter(x => x.kind === 'cli').sort((a, b) => b.found - a.found);
+  box.innerHTML = `<p class="sum">${d ? `MyWiki uses <b>${esc(mcName(d))}</b>${mcTest(d.via, d.model)?.ok ? ', tested and working' : mcTest(d.via, d.model) ? ', but its last test failed' : ', not tested yet'}.`
+      : 'No model chosen yet. Pick one below: choose its model, press <b>Test</b>, then <b>Use as default</b>.'}</p>
+    <h3 class="mch">Agents on this computer<small>Green ones are installed. They use their own sign-in and subscription.</small></h3><ul class="svc mcl">${cli.map(row).join('')}</ul>
+    <h3 class="mch">API keys and local models<small>Pay per use with a key, or run free on this computer with Ollama or LM Studio. MyWiki gives them its own tools, limited to your vault.</small></h3>
+    <ul class="svc mcl">${MC.list.filter(x => x.kind !== 'cli').map(row).join('')}</ul>
+    <h3 class="mch">Per step<small>Optional. Reading is bulk work where a fast, cheap model is fine; writing notes is where quality shows. Only tested models are listed.</small></h3>
+    <ul class="prefs roles" style="margin-top:8px"><li><div><span class="lbl">Reading chats and links</span></div><select data-role="extract" aria-label="Model for reading">${opt(m.extract)}</select></li>
+      <li><div><span class="lbl">Writing notes</span></div><select data-role="integrate" aria-label="Model for writing">${opt(m.integrate)}</select></li></ul>`;
+  box.querySelectorAll('.pick[data-via]').forEach(el => {
+    const pk = picker(el); el.pk = pk;
+    get('/api/models?cli=' + encodeURIComponent(el.dataset.via)).then(r => pk.set(r.models || [], el.dataset.cur || ''));
+  });
+  box.mcReady = () => !!(MC.models.default && mcTest(MC.models.default.via, MC.models.default.model)?.ok);
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-mc]'); if (!b) return;
+  const li = b.closest('li[data-id]'), id = li.dataset.id, act = b.dataset.mc, box = li.closest('#mcSettings, #suBody');
+  const pk = li.querySelector('.pick')?.pk, model = pk ? pk.get() : '';
+  if (act === 'site') return post('/api/open', { what: 'model-site', arg: id });
+  if (act === 'key' || act === 'rmkey' || act === 'base') {
+    const body = act === 'base' ? { id, base: li.querySelector('[data-mc-base]').value.trim() } : act === 'rmkey' ? { id, remove_key: true } : { id, key: li.querySelector('[data-mc-key]').value.trim() };
+    if (act === 'key' && !body.key) return toast('Paste the key first.', true);
+    const r = await post('/api/llm', body); r.ok ? toast(act === 'key' ? 'Key saved. Choose a model and press Test.' : act === 'base' ? 'Address saved.' : 'Key removed.') : toast(r.error, true);
+    return renderMC(box);
+  }
+  if (!model) return toast('Choose a model first.', true);
+  let t = mcTest(id, model);
+  if (act === 'test' || !t?.ok) {
+    b.disabled = true; b.textContent = 'Testing…';
+    const r = await post('/api/model-test', { via: id, model });
+    if (!r.ok) { toast(r.error, true); return renderMC(box); }
+    toast(r.works ? `${model} works. ${r.msg}` : `${model} did not answer: ${r.msg}`, !r.works);
+    if (act === 'test' || !r.works) return renderMC(box);
+  }
+  const r = await post('/api/models-save', { default: { via: id, model } });
+  r.ok ? toast(`MyWiki now uses ${model}.`) : toast(r.error, true);
+  renderMC(box); poll();
+});
+document.addEventListener('change', async e => {
+  const s = e.target.closest('select[data-role]'); if (!s) return;
+  const [via, ...mm] = s.value.split('|');
+  const r = await post('/api/models-save', { [s.dataset.role]: s.value ? { via, model: mm.join('|') } : null });
+  r.ok ? toast('Saved. The next run uses it.') : toast(r.error, true);
+});
+
+/* ---------- first-run setup ---------- */
+const STEPS = [
+  { id: 'vault', name: 'Vault', title: 'Where your notes live', lede: 'MyWiki writes linked markdown notes into a folder you can open in Obsidian. Use a folder you already have, or start a new one.' },
+  { id: 'chats', name: 'Chats', title: 'Chats to learn from', lede: 'MyWiki finds your AI chats on this computer and turns what you learned into notes. It only reads them; it never changes or deletes them.' },
+  { id: 'models', name: 'Model', title: 'The model that does the work', lede: 'Agents already installed here show green. Pick one of their models, test it, and use it. An API key or a local model works too.' },
+  { id: 'search', name: 'Web search', title: 'Searching the web', lede: 'Used for the daily news and for checking what you research. DuckDuckGo is free with no key. Brave and Tavily give better results with a free key.' },
+  { id: 'news', name: 'News', title: 'News you care about', lede: 'Each morning MyWiki gathers stories on these topics; you pick which ones become notes. Change them any time in Settings.' },
+  { id: 'phone', name: 'Phone', title: 'Send things from your phone', lede: 'Optional. A private Telegram bot passes links, photos and topics to MyWiki.' },
+  { id: 'schedule', name: 'Daily run', title: 'When MyWiki works', lede: 'Once a day it reads new chats and writes notes. On Windows a run missed while the computer slept happens when it wakes; on Linux and macOS it waits for the next day.' },
+];
+let SU = null, suAt = 0, suBack = null;
+function borrow(...ids) {  // show Settings parts inside the wizard, put them back after
+  const was = ids.map(i => { const el = $(i); return [el, el.parentNode, el.nextSibling]; });
+  was.forEach(([el]) => $('#suBody').appendChild(el));
+  return () => was.forEach(([el, par, nxt]) => par.insertBefore(el, nxt));
+}
+async function openSetup(at = 0) {
+  SU = await get('/api/setup');
+  $('#setup').hidden = false; document.body.style.overflow = 'hidden';
+  $('#suClose').hidden = !SU.done;
+  suAt = at; drawStep();
+}
+function closeSetup() { if (suBack) { suBack(); suBack = null; } $('#setup').hidden = true; document.body.style.overflow = ''; poll(); if (view === 'settings') loadSettings(); }
+$('#suClose').onclick = closeSetup;
+function drawStep() {
+  if (suBack) { suBack(); suBack = null; }
+  const st = STEPS[suAt], body = $('#suBody');
+  $('#suSteps').innerHTML = STEPS.map((x, i) => `<li class="${i === suAt ? 'on' : i < suAt ? 'done' : ''}"><i>${i < suAt ? '✓' : i + 1}</i><span>${x.name}</span></li>`).join('');
+  $('#suK').textContent = `Step ${suAt + 1} of ${STEPS.length}`; $('#suTitle').textContent = st.title; $('#suLede').textContent = st.lede;
+  $('#suBack').hidden = !suAt; $('#suSkip').hidden = st.id === 'vault' || suAt === STEPS.length - 1; $('#suHint').textContent = '';
+  $('#suNext').textContent = suAt === STEPS.length - 1 ? 'Finish' : 'Next'; $('#suNext').disabled = false;
+  body.innerHTML = ''; body.style.animation = 'none'; body.offsetHeight; body.style.animation = '';
+  if (st.id === 'vault') {
+    body.innerHTML = `<div class="vrow"><input class="field" id="vPath" spellcheck="false" aria-label="Vault folder" value="${esc(SU.vault.path && SU.vault.exists ? SU.vault.path : SU.suggest_vault)}">
+      <button type="button" class="btn quiet" id="vBrowse">Browse…</button></div><p class="say-big" id="vSay"></p>`;
+    const check = async () => {
+      const v = await post('/api/vault-check', { path: $('#vPath').value.trim() }); SU.check = v;
+      $('#vSay').innerHTML = !v.exists ? `This folder does not exist yet. <b>Next</b> creates it as a new vault.`
+        : v.ready ? `A MyWiki vault with <b>${v.notes}</b> notes${v.git ? ', saved to git' : ''}. <b>Next</b> uses it.`
+        : `A folder with <b>${v.notes}</b> notes. MyWiki adds its rule files (${v.missing.map(esc).join(', ')}) and a few folders, and changes nothing else.`;
+    };
+    $('#vPath').oninput = () => { clearTimeout(check.h); check.h = setTimeout(check, 300); };
+    $('#vBrowse').onclick = async () => { $('#vBrowse').disabled = true; const r = await post('/api/pick-folder', { start: $('#vPath').value }); $('#vBrowse').disabled = false; if (r.path) { $('#vPath').value = r.path; check(); } else if (r.none) toast('This system has no folder window (install zenity or kdialog). Type the path instead.', true); };
+    check();
+  } else if (st.id === 'chats') {
+    body.innerHTML = `<ul class="src">${SU.sources.map(x => `<li><input type="checkbox" id="src-${x.id}" data-src="${x.id}"${x.on ? ' checked' : ''}><label for="src-${x.id}"><b>${esc(x.name)}</b></label>
+      <span class="n ${x.found ? '' : 'none'}">${x.id === 'devin' ? (x.found ? 'found' : 'not found') : x.found ? `${x.found} found` : 'none found'}</span><small>Reads ${esc(x.reads)}</small></li>`).join('')}</ul>
+      <h3 class="mch">Names to hide<small>Your own names and handles, comma separated. They become [me] in notes; emails, phone numbers and keys are always removed.</small></h3>
+      <input class="field" id="terms" style="width:100%;margin-top:12px" value="${esc(SU.personal_terms.join(', '))}" aria-label="Names to hide">
+      <p class="say-big">claude.ai chats cannot be read automatically: export them from claude.ai and drop the zip on the Export page.</p>`;
+  } else if (st.id === 'models') {
+    const box = document.createElement('div'); box.id = 'suBodyMc'; body.appendChild(box); renderMC(body);
+  } else if (st.id === 'search') {
+    suBack = borrow('#searchSum', '#svcSearch'); loadServices();
+  } else if (st.id === 'news') {
+    const box = document.createElement('div'); body.appendChild(box); renderTopics(box, SU, false); body.topicsBox = box;
+  } else if (st.id === 'phone') {
+    suBack = borrow('#svcPhone'); loadServices();
+  } else {
+    const box = document.createElement('div'); box.className = 'sched'; box.id = 'suSched'; body.appendChild(box); schedCtl(box, SU, false);
+    body.insertAdjacentHTML('beforeend', `<p class="say-big">Your settings are kept in <code>${esc(SU.home)}</code>, outside your vault. You can change all of this later in Settings.</p>`);
+  }
+}
+async function leaveStep() {  // save this step; false keeps the wizard here
+  const st = STEPS[suAt], hint = t => ($('#suHint').textContent = t, false);
+  if (st.id === 'vault') {
+    const path = $('#vPath').value.trim(); if (!path) return hint('Choose a folder.');
+    const r = await post('/api/vault-use', { path, create: !(SU.check && SU.check.exists) });
+    if (!r.ok) return hint(r.error);
+    SU = await get('/api/setup');
+  } else if (st.id === 'chats') {
+    const on = {}; document.querySelectorAll('[data-src]').forEach(c => on[c.dataset.src] = c.checked);
+    const r = await post('/api/sources', { on, personal_terms: $('#terms').value.split(',') }); if (!r.ok) return hint(r.error);
+  } else if (st.id === 'models') {
+    if (!$('#suBody').mcReady || !$('#suBody').mcReady()) return hint('Test a model and press "Use as default" to go on, or skip for now.');
+  } else if (st.id === 'news') {
+    const r = await post('/api/topics', { topics: $('#suBody').topicsBox.topics() }); if (!r.ok) return hint(r.error);
+  } else if (st.id === 'schedule') {
+    const r = await saveSched($('#suSched')); if (!r.ok) return hint(r.error);
+    await post('/api/setup-done'); SU.done = true;
+  }
+  return true;
+}
+$('#suNext').onclick = async () => {
+  $('#suNext').disabled = true;
+  const ok = await leaveStep().catch(() => ($('#suHint').textContent = 'MyWiki is not answering. Open it again.', false));
+  $('#suNext').disabled = false; if (!ok) return;
+  if (suAt === STEPS.length - 1) { closeSetup(); return toast('MyWiki is set up. Press Run now on the Now page, or wait for the daily run.'); }
+  suAt++; drawStep();
+};
+$('#suSkip').onclick = () => { suAt++; drawStep(); };
+$('#suBack').onclick = () => { suAt--; drawStep(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#setup').hidden && SU && SU.done) closeSetup(); });
+$('#openLogs').onclick = () => post('/api/open', { what: 'logs' });
+
+/* ---------- services: web search + social logins ---------- */
+let SET = null;
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const when = at => !at ? '' : at.slice(0, 10) === todayISO() ? `at ${at.slice(11)}` : `on ${at.slice(0, 10)}`;
+async function loadServices() {
+  SET = await get('/api/settings').catch(() => null); if (!SET) return;
+  const on = SET.search.filter(x => x.on && (!x.needs_key || x.key_from));
+  $('#searchSum').innerHTML = !on.length ? 'No search service is on, so the model always searches the web itself. That works, but it is slower and costs more.'
+    : `<b>${SET.left}</b> web ${SET.left === 1 ? 'search' : 'searches'} left today (${on.map(x => esc(x.name)).join(', ')}). They are used top to bottom; once all are used, the model searches the web itself until tomorrow.`;
+  $('#svcSearch').innerHTML = SET.search.map((x, n) => {
+    const nextUp = SET.search.slice(n + 1).find(y => y.left > 0);
+    let st = '', say = '';
+    if (x.needs_key && !x.key_from) say = 'Not set up. Get a free key from the service and paste it below.';
+    else if (!x.on) say = `Turned off.${x.key_from ? ` A key is ready (${esc(x.key_from)}).` : ''}`;
+    else if (x.last && !x.last.ok && x.last.at.slice(0, 10) === todayISO()) { st = 'bad'; say = `The last search ${when(x.last.at)} failed: ${esc(x.last.msg)}`; }
+    else if (!x.left) { st = 'warn'; say = `All ${x.per_day} searches for today are used. It starts again tomorrow; until then ${nextUp ? esc(nextUp.name) + ' takes over' : 'the model searches the web itself'}.`; }
+    else { st = 'ok'; say = `Working. ${x.used} of ${x.per_day} searches used today${x.last ? `; the last one ${when(x.last.at)} ${x.last.ok ? 'brought ' + esc(x.last.msg) : 'failed'}` : ''}.${x.needs_key ? ` Key ${esc(x.key_from)}.` : ''}`; }
+    return `<li data-id="${x.id}"><span class="st ${st}"></span><div><span class="lbl">${esc(x.name)}</span><p class="say">${say}</p><p class="about">${esc(x.about)}</p></div>
+      <div>${x.on && (!x.needs_key || x.key_from) ? `<span class="meter" title="${x.used} of ${x.per_day} used today"><i style="width:${Math.min(100, x.used / Math.max(1, x.per_day) * 100)}%"></i></span>` : ''}</div>
+      <div class="ctl"><label><input type="checkbox" data-act="on"${x.on ? ' checked' : ''}>Use it</label>
+        <label>Up to <input type="number" min="0" max="500" value="${x.per_day}" data-act="per_day" aria-label="Searches a day"> a day</label>
+        ${x.needs_key ? `<input type="password" placeholder="${x.key_from ? 'Paste a new key to replace it' : 'Paste the key'}" data-act="key" autocomplete="off" aria-label="${esc(x.name)} key"><button type="button" class="btn quiet" data-act="savekey">Save key</button>${x.key_from === 'saved in MyWiki' ? '<button type="button" class="link" data-act="rmkey">Remove key</button>' : ''}` : ''}
+        <button type="button" class="btn quiet" data-act="test"${x.needs_key && !x.key_from ? ' disabled' : ''}>Test (uses 1 search)</button>
+        <button type="button" class="link" data-act="site">${x.needs_key ? 'Get a free key' : 'Website'}</button></div></li>`;
+  }).join('');
+  renderPhone(SET.phone);
+  const so = SET.social, w = so.whisper;
+  const login = so.logins.map(l => {
+    const st = l.state === 'on' ? 'ok' : l.state === 'expired' ? 'bad' : ['YouTube', 'TikTok'].includes(l.site) ? '' : 'warn';
+    const say = l.state === 'on' ? `Logged in. The login lasts until ${esc(l.until || 'the browser session ends')}.`
+      : l.state === 'expired' ? `The login ran out on ${esc(l.until)}. Log in again in your browser and add a fresh cookies.txt.` : st ? `Not logged in. ${esc(l.why)}` : esc(l.why);
+    return `<li><span class="st ${st}"></span><div><span class="lbl">${esc(l.site)}</span><p class="say">${say}</p></div><div></div>
+      ${l.state !== 'off' ? `<div class="ctl"><button type="button" class="link" data-logout="${esc(l.site)}">Remove this login</button></div>` : ''}</li>`;
+  }).join('');
+  const old = so.ytdlp_age != null && so.ytdlp_age > 60;
+  $('#svcSocial').innerHTML = login +
+    `<li><span class="st ${!so.ytdlp ? 'bad' : old ? 'warn' : 'ok'}"></span><div><span class="lbl">Video reader</span><p class="say">${!so.ytdlp ? 'yt-dlp is not installed, so links cannot be read. Install it with <code>pip install yt-dlp</code>.'
+      : old ? `yt-dlp ${esc(so.ytdlp)} is ${so.ytdlp_age} days old. Sites change often, so if links stop working, update it with <code>pip install -U yt-dlp</code>.`
+      : `Ready. yt-dlp ${esc(so.ytdlp)} (${so.ytdlp_age} days old) reads YouTube, Instagram, TikTok, X, Facebook and more.`}</p></div><div></div></li>` +
+    `<li><span class="st ${!w.installed ? 'bad' : 'ok'}"></span><div><span class="lbl">Speech to text</span><p class="say">${!w.installed ? 'Not installed, so videos without subtitles cannot be read. Install it with <code>pip install faster-whisper</code>.'
+      : `Ready. Videos without subtitles (up to ${w.max_minutes} min) are turned into text on this PC, free, with the "${esc(w.model)}" model on the ${w.device === 'cpu' ? 'processor' : 'graphics card'}.${w.downloaded ? '' : ' The model (about 0.5 GB) downloads the first time it is needed.'}`}</p></div><div></div></li>`;
+  $('#cookieHint').textContent = so.cookies ? '' : 'No logins added yet.';
+}
+function renderPhone(ph) {
+  let st = '', say = '', ctl = '';
+  const bot = ph.bot ? `@${esc(ph.bot)}` : 'your bot', link = ph.bot ? `https://t.me/${esc(ph.bot)}` : '';
+  if (!ph.token) {
+    say = `Not set up. Send links and topics to MyWiki from Telegram on your phone. It is free and takes a minute:
+      <ol><li>In Telegram, open <b>@BotFather</b> and send <code>/newbot</code>.</li><li>Pick any name, then a username ending in "bot".</li><li>BotFather replies with a token like <code>123456789:AAF…</code>. Paste it here.</li></ol>`;
+    ctl = `<input type="password" placeholder="Paste the bot token" data-ph="token" autocomplete="off" aria-label="Telegram bot token"><button type="button" class="btn" data-ph="save">Connect</button>`;
+  } else if (!ph.paired) {
+    st = 'warn';
+    say = `${bot} is ready, but not linked to your phone yet. On your phone, open <b>${link ? `<a href="${link}?start=${esc(ph.code)}" target="_blank" rel="noopener">${link.replace('https://', '')}</a>` : 'the bot'}</b> and send this code:
+      <br><span class="code">${esc(ph.code)}</span><br>Only the phone that sends it can use the bot.`;
+    ctl = `<button type="button" class="link" data-ph="remove">Remove the bot</button>`;
+  } else {
+    const l = ph.last, down = l && !l.ok;
+    st = down ? 'bad' : 'ok';
+    say = down ? `Linked to ${bot}, but Telegram cannot be reached right now: ${esc(l.msg)}. It keeps trying every 30 s.`
+      : `Linked. Send links (YouTube, Instagram, TikTok, X, articles) or a topic to ${bot}. ${ph.waiting ? `<b>${ph.waiting}</b> waiting in Research.` : 'Nothing waiting.'}
+        From the phone, <code>/research</code> or <code>/note</code> starts the waiting links, and the bot messages you when the notes are ready.
+        Messages are picked up while MyWiki is open; Telegram keeps them for a day.`;
+    ctl = `<button type="button" class="link" data-ph="unpair">Unlink this phone</button><button type="button" class="link" data-ph="remove">Remove the bot</button>`;
+  }
+  $('#svcPhone').innerHTML = `<li><span class="st ${st}"></span><div><span class="lbl">Telegram</span><p class="say">${say}</p></div><div></div><div class="ctl">${ctl}</div></li>`;
+}
+$('#svcPhone').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-ph]'); if (!b) return;
+  const act = b.dataset.ph, body = act === 'save' ? { token: $('#svcPhone [data-ph=token]').value.trim() } : act === 'unpair' ? { unpair: true } : { remove_token: true };
+  if (act === 'save' && !body.token) return toast('Paste the token first.', true);
+  b.disabled = true;
+  const r = await post('/api/phone', body);
+  r.ok ? toast(act === 'save' ? `Connected to @${r.bot}. Now link your phone with the code.` : act === 'unpair' ? 'Phone unlinked.' : 'Bot removed.') : toast(r.error, true);
+  loadServices();
+});
+$('#svcSearch').addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'), li = e.target.closest('li[data-id]'); if (!b || !li || b.tagName === 'INPUT') return;
+  const id = li.dataset.id, act = b.dataset.act, x = SET.search.find(y => y.id === id);
+  if (act === 'site') return post('/api/open', { what: 'search-site', arg: id });
+  if (act === 'test') { b.disabled = true; b.textContent = 'Testing…'; const r = await post('/api/search-test', { id }); r.ok ? toast(`${x.name}: ${r.msg}`) : toast(`${x.name}: ${r.error}`, true); return loadServices(); }
+  if (act === 'savekey') {
+    const key = li.querySelector('[data-act=key]').value.trim(); if (!key) return toast('Paste the key first.', true);
+    const r = await post('/api/search', { id, key, on: true }); r.ok ? toast(`${x.name} key saved and turned on. Press Test to check it.`) : toast(r.error, true); return loadServices();
+  }
+  if (act === 'rmkey') { const r = await post('/api/search', { id, remove_key: true }); r.ok ? toast('Key removed.') : toast(r.error, true); return loadServices(); }
+});
+$('#svcSearch').addEventListener('change', async e => {
+  const i = e.target.closest('[data-act]'), li = e.target.closest('li[data-id]'); if (!i || !li || !['on', 'per_day'].includes(i.dataset.act)) return;
+  const body = { id: li.dataset.id }; body[i.dataset.act] = i.type === 'checkbox' ? i.checked : +i.value;
+  const r = await post('/api/search', body); r.ok ? toast('Saved.') : toast(r.error, true); loadServices();
+});
+$('#svcSocial').addEventListener('click', async e => {
+  const b = e.target.closest('[data-logout]'); if (!b) return;
+  const r = await post('/api/cookies-clear', { site: b.dataset.logout }); r.ok ? toast(`${b.dataset.logout} login removed.`) : toast(r.error, true); loadServices();
+});
+$('#cookieFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  const r = await fetch('/api/cookies', { method: 'POST', headers: { 'X-Token': TOKEN, 'X-Filename': f.name }, body: f }).then(r => r.json());
+  r.ok ? toast(r.msg) : toast(r.error, true); loadServices();
+});
+
+/* ---------- actions + polling ---------- */
+$('#runNow').onclick = async () => { const r = await post('/api/run'); r.ok ? toast('Run started.') : toast(r.error, true); poll(); };
+$('#openHome').onclick = () => post('/api/open', { what: 'home' });
+async function poll() {
+  try {
+    const first = !S;
+    S = await get('/api/state');
+    if (first && !S.setup_done) openSetup(0);
+    renderNow();
+    if (first && view === 'settings' && S.setup_done) { loadSettings(); loadServices(); }   // opened straight to Settings before the first state arrived
+    if (!SIDE) loadSide();
+    if (poll.lost) location.reload();   // MyWiki was opened again: a new server with a new token
+  } catch (e) {
+    if (!poll.lost) toast('MyWiki stopped in the background. Open MyWiki again; this window reconnects by itself.', true);
+    poll.lost = true; $('#subline').textContent = 'MyWiki stopped. Open it again; this window reconnects by itself.';
+  }
+  clearTimeout(poll.h); poll.h = setTimeout(poll, S && S.running ? 1500 : 4000);
+}
+poll();
+if (document.getElementById('v-' + location.hash.slice(1))) go(location.hash.slice(1));
+</script>
+</body>
+</html>

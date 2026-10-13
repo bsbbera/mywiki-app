@@ -1,0 +1,78 @@
+{
+  "_note": "Shipped defaults. Your own choices live in ~/.mywiki/config.json and override these; the app writes that file, never this one.",
+  "vault": "",
+  "setup_done": false,
+  "models": {"default": null, "extract": null, "integrate": null},
+  "runners": {
+    "claude": {
+      "name": "Claude Code", "site": "https://docs.anthropic.com/en/docs/claude-code",
+      "sign_in": "Run claude once and log in.",
+      "cmd": ["claude", "-p", "{prompt}", "--model", "{model}", "--permission-mode", "acceptEdits", "--allowedTools", "Read,Write,Edit,Glob,Grep", "--setting-sources", "project,local"],
+      "_note": "--setting-sources skips ~/.claude/settings.json (its env can point claude elsewhere); headless runs use the saved login. acceptEdits + an allow-list, never skip-permissions",
+      "suggest": ["haiku", "sonnet", "opus"]
+    },
+    "devin": {
+      "name": "Devin", "site": "https://cli.devin.ai",
+      "sign_in": "Run devin once and log in.",
+      "cmd": ["devin", "--config", "{home}/devin-runner.json", "--model", "{model}", "--permission-mode", "auto", "-p", "{prompt}"],
+      "_note": "auto = read-only tools approved; writes allowed only inside the vault by the rules MyWiki writes to ~/.mywiki/devin-runner.json. Its web fetch is refused in this mode, so MyWiki reads pages itself",
+      "suggest": ["swe-2-high", "claude-sonnet-5-5-medium"]
+    },
+    "agy": {
+      "name": "Antigravity", "site": "https://antigravity.google",
+      "sign_in": "Run agy once and log in. Headless agy refuses file tools unless allowed in ~/.gemini/antigravity-cli/settings.json (permissions.allow).",
+      "cmd": ["agy", "--disable-slash-commands", "--model", "{model}", "--mode", "accept-edits", "--print-timeout", "0s", "-p", "{prompt}"],
+      "suggest": ["gemini-3.8-flash-high"]
+    },
+    "gemini": {
+      "name": "Gemini CLI", "site": "https://github.com/google-gemini/gemini-cli",
+      "sign_in": "Run gemini once and log in.",
+      "cmd": ["gemini", "-m", "{model}", "--approval-mode", "auto_edit", "-p", "{prompt}"],
+      "suggest": ["gemini-2.5-flash", "gemini-2.5-pro"]
+    },
+    "codex": {
+      "name": "Codex", "site": "https://github.com/openai/codex",
+      "sign_in": "Run codex once and log in.",
+      "cmd": ["codex", "exec", "--sandbox", "workspace-write", "--skip-git-repo-check", "-m", "{model}", "{prompt}"],
+      "suggest": ["gpt-5-codex", "gpt-5"]
+    },
+    "kimi": {
+      "name": "Kimi Code", "site": "https://moonshotai.github.io/kimi-code/",
+      "sign_in": "Run kimi login once.",
+      "cmd": ["kimi", "--auto", "-m", "{model}", "-p", "{prompt}"],
+      "suggest": []
+    },
+    "qwen": {
+      "name": "Qwen Code", "site": "https://github.com/QwenLM/qwen-code",
+      "sign_in": "Run qwen once and log in.",
+      "cmd": ["qwen", "-m", "{model}", "--approval-mode", "auto_edit", "-p", "{prompt}"],
+      "suggest": []
+    },
+    "opencode": {
+      "name": "OpenCode", "site": "https://opencode.ai",
+      "sign_in": "Run opencode auth login once.",
+      "cmd": ["opencode", "run", "-m", "{model}", "{prompt}"],
+      "suggest": []
+    }
+  },
+  "providers": {"custom": {"base": ""}},
+  "sources": {"claude-code": true, "devin": true, "antigravity": true, "quire": false, "claude-ai": true, "quire-research": false},
+  "quire_workspaces": [],
+  "quire_kinds": ["chat"],
+  "skip_markers": ["You are executing one stage of", "You are choosing the look of"],
+  "personal_terms": [],
+  "schedule": {"on": true, "time": "11:00"},
+  "idle_hours": 2,
+  "min_chars": 400,
+  "chunk_chars": 18000,
+  "max_extract_per_run": 30,
+  "max_integrate_per_run": 15,
+  "migrate_batch_size": 50,
+  "migrate_chunk": 10,
+  "migrate_batches_per_run": 0,
+  "extract_timeout": 600,
+  "integrate_timeout": 1500,
+  "extract_workers": 4,
+  "integrate_workers": 3,
+  "search": {"ddg": {"on": true}}
+}
