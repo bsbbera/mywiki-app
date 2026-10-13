@@ -92,6 +92,10 @@ Runs against a throwaway home folder and vault; your settings and notes are not 
 
 Turn off the daily run in Settings (or `crontab -e` / `schtasks /delete /tn MyWiki-Ingest`), then delete this folder and `~/.mywiki`. Your vault stays as it is.
 
+## Contributors
+
+- [Mitaash Paul](https://github.com/mitaash96): first-run setup no longer blocks on the daily-run step (#1).
+
 ## License
 
 MIT, see `LICENSE`.
