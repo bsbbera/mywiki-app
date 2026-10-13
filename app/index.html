@@ -1125,7 +1125,7 @@ async function leaveStep() {  // save this step; false keeps the wizard here
   } else if (st.id === 'news') {
     const r = await post('/api/topics', { topics: $('#suBody').topicsBox.topics() }); if (!r.ok) return hint(r.error);
   } else if (st.id === 'schedule') {
-    const r = await saveSched($('#suSched')); if (!r.ok) return hint(r.error);
+    const r = await saveSched($('#suSched')); if (!r.ok) toast('Daily run not set: ' + r.error + ' You can set it later in Settings.', true);  // optional, never blocks Finish
     await post('/api/setup-done'); SU.done = true;
   }
   return true;
