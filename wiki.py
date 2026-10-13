@@ -2538,15 +2538,18 @@ def schedule_set(on, at='11:00'):
                 return {'ok': False, 'error': (r.stderr or r.stdout).strip()[:300]}
     else:
         cur = subprocess.run(['crontab', '-l'], capture_output=True, text=True).stdout if shutil.which('crontab') else None
-        if cur is None:
+        if cur is None and not on:
+            pass  # nothing to remove
+        elif cur is None:
             return {'ok': False, 'error': 'No crontab on this computer. Run "python wiki.py run" daily with your own scheduler.'}
-        lines = [l for l in cur.splitlines() if CRON_TAG not in l]
-        if on:
-            remember_path()
-            lines.append(cron_line(at, job))
-        r = subprocess.run(['crontab', '-'], input='\n'.join(lines) + '\n', capture_output=True, text=True)
-        if r.returncode:
-            return {'ok': False, 'error': r.stderr.strip()[:300]}
+        if cur is not None:
+            lines = [l for l in cur.splitlines() if CRON_TAG not in l]
+            if on:
+                remember_path()
+                lines.append(cron_line(at, job))
+            r = subprocess.run(['crontab', '-'], input='\n'.join(lines) + '\n', capture_output=True, text=True)
+            if r.returncode:
+                return {'ok': False, 'error': r.stderr.strip()[:300]}
     save_cfg({'schedule': {'on': bool(on), 'time': at}})
     return {'ok': True}
 
