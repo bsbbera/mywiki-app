@@ -125,8 +125,8 @@ PROGRESS = os.path.join(STATE, 'progress.json')
 def progress(stage, state='running', done=0, total=0, unit='', **extra):
     """What the app shows. A run: harvest, extract, integrate, connect, migrate, save. A news run: research, brief, integrate, connect, save."""
     p = load_json(PROGRESS, {})
-    if stage in ('harvest', 'research', 'consolidate') and state == 'running' and not done and p.get('current') != stage:
-        p = {'started': time.time(), 'stages': {}, 'kind': {'research': 'news', 'consolidate': 'consolidate'}.get(stage, 'run')}
+    if stage in ('harvest', 'research', 'consolidate') and state == 'running' and not done and (p.get('current') != stage or p.get('pid') != os.getpid()):
+        p = {'started': time.time(), 'stages': {}, 'kind': {'research': 'news', 'consolidate': 'consolidate'}.get(stage, 'run'), 'pid': os.getpid()}  # pid: a run that died mid-harvest is not this one
     p.setdefault('stages', {}).setdefault(stage, {}).update(state=state, done=done, total=total, unit=unit, **extra)
     p['current'], p['updated'] = stage, time.time()
     save_json(PROGRESS, p)
@@ -246,7 +246,7 @@ def src_devin():
     if not os.path.exists(p):
         return
     db = sqlite3.connect(f'file:{p}?mode=ro', uri=True)
-    for sid, cwd, title, last in db.execute('select id, working_directory, title, last_activity_at from sessions where hidden = 0'):
+    def load(sid):  # messages are read only for sessions harvest has not seen at this last_activity_at (the db grows to GBs)
         msgs, seen = [], set()
         for (m,) in db.execute('select chat_message from message_nodes where session_id = ? order by node_id', (sid,)):
             try:
@@ -261,7 +261,9 @@ def src_devin():
             t = blocks_text(d.get('content')).strip()
             if t:
                 msgs.append((d['role'], t))
-        yield dict(source='devin', id=sid, title=title or '', where=cwd, updated=last, msgs=msgs)
+        return msgs
+    for sid, cwd, title, last in db.execute('select id, working_directory, title, last_activity_at from sessions where hidden = 0').fetchall():
+        yield dict(source='devin', id=sid, title=title or '', where=cwd, updated=last, load=lambda sid=sid: load(sid))
 
 
 def src_antigravity():
@@ -368,9 +370,13 @@ def harvest():
             rec = led['sessions'].setdefault(key, {'n': 0})
             if s['title'] and not rec.get('title'):  # backfills chats seen before titles were kept
                 rec['title'] = scrub(s['title'])[:80]
-            msgs = s['msgs']
-            if len(msgs) <= rec['n'] or NOW - s['updated'] < idle:
-                continue  # nothing new, or still being chatted in
+            if NOW - s['updated'] < idle or ('load' in s and rec.get('upd') == s['updated']):
+                continue  # still being chatted in, or a lazy source unchanged since it was last read
+            msgs = s['msgs'] if 'msgs' in s else s['load']()
+            if 'load' in s:
+                rec['upd'] = s['updated']
+            if len(msgs) <= rec['n']:
+                continue  # nothing new
             if not is_human(msgs):
                 rec.update(n=len(msgs), human=False)
                 skipped += 1
