@@ -213,28 +213,33 @@ def blocks_text(content):
 
 def src_claude_code():
     for f in glob.glob(os.path.join(H, '.claude', 'projects', '*', '*.jsonl')):
-        msgs, entry, cwd, title = [], None, '', ''
-        with open(f, encoding='utf8', errors='replace') as h:
-            for line in h:
-                try:
-                    d = json.loads(line)
-                except ValueError:
-                    continue
-                entry = entry or d.get('entrypoint')
-                cwd = cwd or d.get('cwd', '')
-                title = d.get('customTitle') or d.get('aiTitle') or title
-                if d.get('type') not in ('user', 'assistant') or d.get('isMeta') or d.get('isSidechain') or d.get('isCompactSummary'):
-                    continue
-                c = (d.get('message') or {}).get('content')
-                if isinstance(c, list) and any(isinstance(b, dict) and b.get('type') == 'tool_result' for b in c):
-                    continue
-                t = blocks_text(c).strip()
-                if t:
-                    msgs.append((d['type'], t))
-        if entry and str(entry).startswith('sdk'):
-            msgs = []  # headless runs (Quire, this pipeline): never a person
-        yield dict(source='claude-code', id=os.path.basename(f)[:-6], title=title, where=cwd,
-                   updated=os.path.getmtime(f), msgs=msgs)
+        yield dict(source='claude-code', id=os.path.basename(f)[:-6], title='', where='', updated=os.path.getmtime(f),
+                   load=lambda s, f=f: _read_claude_code(f, s))
+
+
+def _read_claude_code(f, s):
+    msgs, entry, cwd, title = [], None, '', ''
+    with open(f, encoding='utf8', errors='replace') as h:
+        for line in h:
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            entry = entry or d.get('entrypoint')
+            cwd = cwd or d.get('cwd', '')
+            title = d.get('customTitle') or d.get('aiTitle') or title
+            if d.get('type') not in ('user', 'assistant') or d.get('isMeta') or d.get('isSidechain') or d.get('isCompactSummary'):
+                continue
+            c = (d.get('message') or {}).get('content')
+            if isinstance(c, list) and any(isinstance(b, dict) and b.get('type') == 'tool_result' for b in c):
+                continue
+            t = blocks_text(c).strip()
+            if t:
+                msgs.append((d['type'], t))
+    s.update(title=title, where=cwd)
+    if entry and str(entry).startswith('sdk'):
+        return []  # headless runs (Quire, this pipeline): never a person
+    return msgs
 
 
 DEVIN_DBS = [os.path.join(H, 'AppData', 'Roaming', 'devin', 'cli', 'sessions.db'), os.path.join(H, '.config', 'devin', 'cli', 'sessions.db'),
@@ -263,26 +268,30 @@ def src_devin():
                 msgs.append((d['role'], t))
         return msgs
     for sid, cwd, title, last in db.execute('select id, working_directory, title, last_activity_at from sessions where hidden = 0').fetchall():
-        yield dict(source='devin', id=sid, title=title or '', where=cwd, updated=last, load=lambda sid=sid: load(sid))
+        yield dict(source='devin', id=sid, title=title or '', where=cwd, updated=last, load=lambda s, sid=sid: load(sid))
 
 
 def src_antigravity():
     for base in ('antigravity', 'antigravity-cli'):
         for f in glob.glob(os.path.join(H, '.gemini', base, 'brain', '*', '.system_generated', 'logs', 'transcript.jsonl')):
-            msgs = []
-            with open(f, encoding='utf8', errors='replace') as h:
-                for line in h:
-                    try:
-                        d = json.loads(line)
-                    except ValueError:
-                        continue
-                    t = (d.get('content') or '').strip() if isinstance(d.get('content'), str) else ''
-                    if d.get('type') == 'USER_INPUT' and t:
-                        msgs.append(('user', re.sub(r'</?USER_REQUEST>', '', t).strip()))
-                    elif d.get('type') == 'PLANNER_RESPONSE' and t:
-                        msgs.append(('assistant', t))
             cid = f.replace('\\', '/').split('/brain/')[1].split('/')[0]
-            yield dict(source='antigravity', id=cid, title='', where='', updated=os.path.getmtime(f), msgs=msgs)
+            yield dict(source='antigravity', id=cid, title='', where='', updated=os.path.getmtime(f), load=lambda s, f=f: _read_antigravity(f))
+
+
+def _read_antigravity(f):
+    msgs = []
+    with open(f, encoding='utf8', errors='replace') as h:
+        for line in h:
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            t = (d.get('content') or '').strip() if isinstance(d.get('content'), str) else ''
+            if d.get('type') == 'USER_INPUT' and t:
+                msgs.append(('user', re.sub(r'</?USER_REQUEST>', '', t).strip()))
+            elif d.get('type') == 'PLANNER_RESPONSE' and t:
+                msgs.append(('assistant', t))
+    return msgs
 
 
 def src_quire():
@@ -368,13 +377,14 @@ def harvest():
         for s in sessions:
             key = f"{s['source']}:{s['id']}"
             rec = led['sessions'].setdefault(key, {'n': 0})
-            if s['title'] and not rec.get('title'):  # backfills chats seen before titles were kept
-                rec['title'] = scrub(s['title'])[:80]
+            # growth-proof: sources list sessions cheaply (id + last change); a chat is read only when it changed since the last run
             if NOW - s['updated'] < idle or ('load' in s and rec.get('upd') == s['updated']):
-                continue  # still being chatted in, or a lazy source unchanged since it was last read
-            msgs = s['msgs'] if 'msgs' in s else s['load']()
+                continue  # still being chatted in, or unchanged since it was last read
+            msgs = s['msgs'] if 'msgs' in s else s['load'](s)
             if 'load' in s:
                 rec['upd'] = s['updated']
+            if s['title'] and not rec.get('title'):  # backfills chats seen before titles were kept
+                rec['title'] = scrub(s['title'])[:80]
             if len(msgs) <= rec['n']:
                 continue  # nothing new
             if not is_human(msgs):
