@@ -36,6 +36,15 @@ assert 'type: person' in t2 and t2.count('title:') == 1 and t2.endswith('---\nbo
 u = os.path.basename(wiki.H)
 assert u.lower() not in wiki.scrub('file:///c%3A%5CUsers%5C' + u + '%5CDesktop').lower()
 assert wiki.clean('<ADDITIONAL_METADATA>\ntime\n</ADDITIONAL_METADATA>hi') == 'hi'
+# harvest reads a chat only when it changed since the last run, so run time does not grow with chat history
+reads = []
+def _src():
+    yield dict(source='t', id='1', title='T', where='', updated=wiki.NOW - 99999,
+               load=lambda s: reads.append(1) or [('user', 'what is a lazy reader? ' * 30), ('assistant', 'one that waits ' * 30)])
+SRC0, wiki.SOURCES = wiki.SOURCES, {'t': _src}
+wiki.harvest(); wiki.harvest()
+assert len(reads) == 1, reads
+wiki.SOURCES = SRC0
 r = wiki.rules_text()  # fails if INGEST-AUTO.md headings get renamed and extract would lose its rules
 assert 'What counts as knowledge' in r[0] and 'Card format' in r[0] and 'type' in r[1], r[0][:200]
 room = wiki.CMD_MAX - len(subprocess.list2cmdline([wiki.extract_prompt('', r)])) - 1500  # harvest's piece size
